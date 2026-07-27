@@ -1,0 +1,15 @@
+/* Global styles. Component-specific styles live with their components. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+}

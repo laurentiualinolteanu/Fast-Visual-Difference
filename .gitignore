@@ -1,0 +1,54 @@
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Compiled output
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Node
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+# Miscellaneous
+/.angular/cache
+.sass-cache/
+/connect.lock
+/coverage
+/libpeerconnection.log
+testem.log
+/typings
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Agent workspace
+.claude/
+
+# Internal design documents.
+# These are working notes, not part of the submission (see Review_and_Interview_Guide I7):
+# the deliverable is source + README. Kept on disk, deliberately out of the repo so the
+# submitted tree never contains them and no history rewrite is needed later.
+Architecture_Specification.md
+Implementation_Guide.md
+Review_and_Interview_Guide.md
+Development_Backlog.md
