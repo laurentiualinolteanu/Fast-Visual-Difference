@@ -89,6 +89,21 @@ export const BRIDGE_CELLS = 2;
 export const MERGE_GAP_PX = 8;
 
 /**
+ * How many times Stage 4 re-runs the merge at a given gap. Each pass can only join boxes
+ * that a previous pass has already grown, so the sequence converges quickly; the limit
+ * exists because each pass is O(k^2) and the tail passes rarely change anything.
+ */
+export const MERGE_PASSES = 3;
+
+/**
+ * Factor by which the merge gap grows when there are still too many boxes, and the point
+ * at which growing it further is admitting defeat. Tripling reaches the ceiling in four
+ * steps (8, 24, 72, 216), so the escalation cannot spin.
+ */
+export const MERGE_GAP_ESCALATION = 3;
+export const MAX_MERGE_GAP_PX = 128;
+
+/**
  * Hard ceiling on returned boxes. Rendering is inside the measured window, so an
  * unbounded box count would make paint the bottleneck. Exceeding it coarsens the merge
  * and, failing that, truncates — always with a warning, never silently.
