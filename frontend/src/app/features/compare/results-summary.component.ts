@@ -41,8 +41,8 @@ import { screenedInPercent } from '../../core/log-diff-run';
     @if (result(); as diff) {
       <p class="compared">
         <span class="lead">Compared:</span>
-        {{ diff.boxes.length }} difference{{ diff.boxes.length === 1 ? '' : 's' }}
-        in {{ format(elapsedMs()) }} ms
+        {{ diff.boxes.length }} difference{{ diff.boxes.length === 1 ? '' : 's' }} in
+        {{ format(elapsedMs()) }} ms
         <span class="note">click to painted boxes</span>
         @if (stale()) {
           <em class="stale">(re-run to update)</em>
@@ -50,14 +50,14 @@ import { screenedInPercent } from '../../core/log-diff-run';
       </p>
 
       <p class="stages">
-        Engine {{ format(diff.timings.totalMs) }} ms —
-        screen {{ format(diff.timings.screenMs) }} &middot;
-        score {{ format(diff.timings.scoreMs) }} &middot;
-        group {{ format(diff.timings.groupMs) }} &middot;
-        merge {{ format(diff.timings.mergeMs) }} ms
+        Engine {{ format(diff.timings.totalMs) }} ms — screen
+        {{ format(diff.timings.screenMs) }} &middot; score
+        {{ format(diff.timings.scoreMs) }} &middot; group
+        {{ format(diff.timings.groupMs) }} &middot; merge {{ format(diff.timings.mergeMs) }} ms
         <span class="note">
-          {{ diff.stats.candidateTiles }} of {{ diff.stats.totalTiles }} tiles screened in
-          ({{ screenedIn() }}%)
+          {{ diff.stats.candidateTiles }} of {{ diff.stats.totalTiles }} tiles screened in ({{
+            screenedIn()
+          }}%)
         </span>
       </p>
 

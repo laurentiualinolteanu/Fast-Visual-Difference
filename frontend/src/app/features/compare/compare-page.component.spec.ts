@@ -101,7 +101,10 @@ describe('ComparePageComponent', () => {
   let toasts: ToastMessageOptions[];
 
   const detailOf = (severity: string) =>
-    toasts.filter((toast) => toast.severity === severity).map((toast) => toast.detail).join(' ');
+    toasts
+      .filter((toast) => toast.severity === severity)
+      .map((toast) => toast.detail)
+      .join(' ');
 
   beforeEach(() => {
     // Every completed run emits one structured line (see `core/log-diff-run.ts`). These

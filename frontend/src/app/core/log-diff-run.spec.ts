@@ -60,16 +60,14 @@ describe('formatDiffRun', () => {
   });
 
   it('describes what the stages produced', () => {
-    expect(formatDiffRun(diffResult(), context)).toContain(
-      'px 241 cells 19 regions 2 -> 1 boxes',
-    );
+    expect(formatDiffRun(diffResult(), context)).toContain('px 241 cells 19 regions 2 -> 1 boxes');
   });
 
   it('mentions warnings only when there are some', () => {
     expect(formatDiffRun(diffResult(), context)).not.toContain('warning');
-    expect(
-      formatDiffRun(diffResult({ warnings: ['Images differ in size'] }), context),
-    ).toContain('1 warning(s)');
+    expect(formatDiffRun(diffResult({ warnings: ['Images differ in size'] }), context)).toContain(
+      '1 warning(s)',
+    );
   });
 
   it('stays on one line', () => {

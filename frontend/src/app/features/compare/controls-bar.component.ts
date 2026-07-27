@@ -101,8 +101,8 @@ export interface FileSelection {
           useless.
         -->
         <p class="derived">
-          detects brightness/colour steps of about {{ derived().equivalentLumaStep }}/255
-          &middot; min cluster {{ derived().minChangedPixels }} px
+          detects brightness/colour steps of about {{ derived().equivalentLumaStep }}/255 &middot;
+          min cluster {{ derived().minChangedPixels }} px
         </p>
       </div>
 
@@ -114,7 +114,9 @@ export interface FileSelection {
           [ngModel]="settings().suppressAntiAliasing"
           (ngModelChange)="onSuppressionChange($event)"
         />
-        <label class="checkbox-label" for="suppress-aa">Ignore anti-aliasing &amp; 1px shifts</label>
+        <label class="checkbox-label" for="suppress-aa">
+          Ignore anti-aliasing &amp; 1px shifts
+        </label>
       </div>
 
       <span

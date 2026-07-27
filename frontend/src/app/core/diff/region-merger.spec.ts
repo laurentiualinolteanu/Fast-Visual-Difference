@@ -37,8 +37,12 @@ describe('mergeAndFinalise', () => {
       const close = finalise([region(100, 100, 10, 10), region(near, 100, 10, 10)]);
       const distant = finalise([region(100, 100, 10, 10), region(far, 100, 10, 10)]);
 
-      expect(close.boxes.length).withContext(`${MERGE_GAP_PX - 2}px apart`).toBe(1);
-      expect(distant.boxes.length).withContext(`${MERGE_GAP_PX * 3}px apart`).toBe(2);
+      expect(close.boxes.length)
+        .withContext(`${MERGE_GAP_PX - 2}px apart`)
+        .toBe(1);
+      expect(distant.boxes.length)
+        .withContext(`${MERGE_GAP_PX * 3}px apart`)
+        .toBe(2);
     });
 
     it('merges vertically as readily as horizontally', () => {
@@ -70,10 +74,7 @@ describe('mergeAndFinalise', () => {
     });
 
     it('adds up the changed pixels of everything it merges', () => {
-      const { boxes } = finalise([
-        region(100, 100, 10, 10, 40),
-        region(116, 100, 10, 10, 25),
-      ]);
+      const { boxes } = finalise([region(100, 100, 10, 10, 40), region(116, 100, 10, 10, 25)]);
 
       expect(boxes[0].changedPixels).toBe(65);
     });

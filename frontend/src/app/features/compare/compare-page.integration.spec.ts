@@ -34,7 +34,10 @@ async function pngFile(
   paint?.(context);
 
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((result) => (result ? resolve(result) : reject(new Error('toBlob failed'))), 'image/png'),
+    canvas.toBlob(
+      (result) => (result ? resolve(result) : reject(new Error('toBlob failed'))),
+      'image/png',
+    ),
   );
 
   return new File([blob], name, { type: 'image/png' });
@@ -66,7 +69,9 @@ describe('compare page against a real worker', () => {
       }),
     );
 
-    expect(toasts.map((toast) => toast.detail)).withContext('a file failed to load').toEqual([]);
+    expect(toasts.map((toast) => toast.detail))
+      .withContext('a file failed to load')
+      .toEqual([]);
     expect(page.canCompare()).toBeTrue();
 
     await page.onCompare();

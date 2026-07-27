@@ -88,7 +88,10 @@ describe('handleRequest', () => {
 
       const first = expectResult(handleRequest(compareRequest, images));
       const second = expectResult(
-        handleRequest({ kind: 'compare', settings: { ...DEFAULT_SETTINGS, sensitivity: 9 } }, images),
+        handleRequest(
+          { kind: 'compare', settings: { ...DEFAULT_SETTINGS, sensitivity: 9 } },
+          images,
+        ),
       );
 
       expect(first.stats.width).toBe(32);
@@ -135,9 +138,9 @@ describe('toFailure', () => {
 
   it('falls back to "unknown" when the request is not recognisable', () => {
     expect(toFailure(undefined, new Error('boom')).kind).toBe('unknown');
-    expect(toFailure({ kind: 'nonsense' } as unknown as DiffWorkerRequest, new Error('x')).kind).toBe(
-      'unknown',
-    );
+    expect(
+      toFailure({ kind: 'nonsense' } as unknown as DiffWorkerRequest, new Error('x')).kind,
+    ).toBe('unknown');
   });
 
   it('survives something that is not an Error being thrown', () => {

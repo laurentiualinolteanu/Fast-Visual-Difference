@@ -1,13 +1,6 @@
 ﻿import { ImageDataLike } from './diff-types';
 import { TILE } from './sensitivity';
-import {
-  BLACK,
-  WHITE,
-  cloneImage,
-  paintRowGradient,
-  setPixel,
-  solidImage,
-} from './test-support';
+import { BLACK, WHITE, cloneImage, paintRowGradient, setPixel, solidImage } from './test-support';
 import { screenTiles } from './tile-screener';
 
 /** Index of the tile containing pixel (x, y). */

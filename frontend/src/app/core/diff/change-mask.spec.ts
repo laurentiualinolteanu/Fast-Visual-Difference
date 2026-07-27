@@ -61,12 +61,7 @@ function changedColumns(mask: ChangeMask): Set<number> {
  * vacuously. Columns with no source (shifted in from beyond the left edge) are filled
  * white, standing in for genuinely new content.
  */
-function paintColumns(
-  image: ImageDataLike,
-  fromY: number,
-  toY: number,
-  offset: number = 0,
-): void {
+function paintColumns(image: ImageDataLike, fromY: number, toY: number, offset: number = 0): void {
   for (let y = fromY; y <= toY; y++) {
     for (let x = 0; x < image.width; x++) {
       const source = x - offset;
@@ -579,4 +574,3 @@ describe('buildChangeMask', () => {
     });
   });
 });
-

@@ -9,9 +9,14 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
     "samples": "esbuild samples/generate.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/fvd-samples.mjs --log-level=error && node node_modules/.cache/fvd-samples.mjs",
-    "measure": "esbuild samples/measure.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/fvd-measure.mjs --log-level=error && node node_modules/.cache/fvd-measure.mjs"
+    "measure": "esbuild samples/measure.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/fvd-measure.mjs --log-level=error && node node_modules/.cache/fvd-measure.mjs",
+    "format": "prettier --write \"src/**/*.{ts,html,css}\" \"samples/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,css}\" \"samples/**/*.ts\""
   },
   "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "htmlWhitespaceSensitivity": "ignore",
     "overrides": [
       {
         "files": "*.html",
@@ -49,6 +54,7 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "prettier": "3.9.6",
     "typescript": "~5.8.2"
   }
 }

@@ -86,7 +86,12 @@ describe('ResultsSummaryComponent', () => {
     it('leads with click-to-paint, which is the interval the markers bracket', () => {
       // Not the engine total: that is the smaller number, and reporting the smaller one
       // as the headline is exactly the accusation this component exists to answer.
-      render({ result: diffResult(), before: loadedImage(84), after: loadedImage(91), elapsedMs: 25.9 });
+      render({
+        result: diffResult(),
+        before: loadedImage(84),
+        after: loadedImage(91),
+        elapsedMs: 25.9,
+      });
 
       expect(text('.compared')).toContain('2 differences in 26 ms');
       expect(text('.compared')).toContain('click to painted boxes');

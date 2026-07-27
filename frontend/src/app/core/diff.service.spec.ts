@@ -1,11 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import {
-  DIFF_WORKER_FACTORY,
-  DiffService,
-  DiffWorkerFactory,
-  LoadedImage,
-} from './diff.service';
+import { DIFF_WORKER_FACTORY, DiffService, DiffWorkerFactory, LoadedImage } from './diff.service';
 import {
   DiffWorkerRequest,
   DiffWorkerResponse,
@@ -116,7 +111,10 @@ async function pngFile(
   paint?.(context);
 
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((result) => (result ? resolve(result) : reject(new Error('toBlob failed'))), 'image/png'),
+    canvas.toBlob(
+      (result) => (result ? resolve(result) : reject(new Error('toBlob failed'))),
+      'image/png',
+    ),
   );
 
   return new File([blob], name, { type: 'image/png' });

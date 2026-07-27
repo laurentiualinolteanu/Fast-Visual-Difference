@@ -75,8 +75,22 @@ describe('runDiff', () => {
 
       const [right, bottom] = result.boxes;
       expect(result.boxes.length).toBe(2);
-      expect(right).toEqual({ x: 160, y: 0, width: 40, height: 140, changedPixels: 0, kind: 'size' });
-      expect(bottom).toEqual({ x: 0, y: 100, width: 160, height: 40, changedPixels: 0, kind: 'size' });
+      expect(right).toEqual({
+        x: 160,
+        y: 0,
+        width: 40,
+        height: 140,
+        changedPixels: 0,
+        kind: 'size',
+      });
+      expect(bottom).toEqual({
+        x: 0,
+        y: 100,
+        width: 160,
+        height: 40,
+        changedPixels: 0,
+        kind: 'size',
+      });
 
       // The bottom band stops where the right band starts, so the corner is claimed once.
       expect(bottom.x + bottom.width).toBe(right.x);
@@ -154,7 +168,10 @@ describe('runDiff', () => {
     it('reports a positive total and non-negative stages that fit inside it', () => {
       // Big enough that the diff outlasts the clock's granularity: performance.now() is
       // coarse in some browser configurations, and a 64x64 comparison can round to zero.
-      const result = diff(solidImage(500, 500, [100, 100, 100]), solidImage(500, 500, [130, 130, 130]));
+      const result = diff(
+        solidImage(500, 500, [100, 100, 100]),
+        solidImage(500, 500, [130, 130, 130]),
+      );
       const { screenMs, scoreMs, groupMs, mergeMs, totalMs } = result.timings;
 
       expect(totalMs).toBeGreaterThan(0);
@@ -213,17 +230,37 @@ describe('runDiff', () => {
     });
 
     it('rejects an empty before image, naming it', () => {
-      expect(() => runDiff({ width: 0, height: 10, data: new Uint8ClampedArray(0) }, solidImage(10, 10), DEFAULT_SETTINGS))
-        .toThrowError(/before image.*0x10/);
-      expect(() => runDiff({ width: 10, height: 0, data: new Uint8ClampedArray(0) }, solidImage(10, 10), DEFAULT_SETTINGS))
-        .toThrowError(/before image.*10x0/);
+      expect(() =>
+        runDiff(
+          { width: 0, height: 10, data: new Uint8ClampedArray(0) },
+          solidImage(10, 10),
+          DEFAULT_SETTINGS,
+        ),
+      ).toThrowError(/before image.*0x10/);
+      expect(() =>
+        runDiff(
+          { width: 10, height: 0, data: new Uint8ClampedArray(0) },
+          solidImage(10, 10),
+          DEFAULT_SETTINGS,
+        ),
+      ).toThrowError(/before image.*10x0/);
     });
 
     it('rejects an empty after image, naming it', () => {
-      expect(() => runDiff(solidImage(10, 10), { width: 0, height: 10, data: new Uint8ClampedArray(0) }, DEFAULT_SETTINGS))
-        .toThrowError(/after image.*0x10/);
-      expect(() => runDiff(solidImage(10, 10), { width: 10, height: 0, data: new Uint8ClampedArray(0) }, DEFAULT_SETTINGS))
-        .toThrowError(/after image.*10x0/);
+      expect(() =>
+        runDiff(
+          solidImage(10, 10),
+          { width: 0, height: 10, data: new Uint8ClampedArray(0) },
+          DEFAULT_SETTINGS,
+        ),
+      ).toThrowError(/after image.*0x10/);
+      expect(() =>
+        runDiff(
+          solidImage(10, 10),
+          { width: 10, height: 0, data: new Uint8ClampedArray(0) },
+          DEFAULT_SETTINGS,
+        ),
+      ).toThrowError(/after image.*10x0/);
     });
   });
 });

@@ -3,11 +3,7 @@ import { Injectable, InjectionToken, OnDestroy, inject } from '@angular/core';
 import { messageOf } from './error-message';
 
 import type { DiffResult, DiffSettings } from './diff/diff-types';
-import type {
-  DiffWorkerRequest,
-  DiffWorkerResponse,
-  ImageSlot,
-} from './diff-worker-protocol';
+import type { DiffWorkerRequest, DiffWorkerResponse, ImageSlot } from './diff-worker-protocol';
 
 /**
  * The only module in the app that knows a worker exists.
@@ -85,18 +81,15 @@ export function largeImageWarning(image: LoadedImage): string | null {
 /** How the service obtains its worker. Replaced in tests; never replaced in the app. */
 export type DiffWorkerFactory = () => Worker;
 
-export const DIFF_WORKER_FACTORY = new InjectionToken<DiffWorkerFactory>(
-  'DIFF_WORKER_FACTORY',
-  {
-    providedIn: 'root',
-    /*
-     * The `new Worker(new URL(...), { type: 'module' })` literal is what the bundler
-     * pattern-matches to emit the worker as its own chunk. Building the URL any other way
-     * — a variable, a string concatenation — silently produces a 404 at runtime.
-     */
-    factory: () => () => new Worker(new URL('./diff.worker', import.meta.url), { type: 'module' }),
-  },
-);
+export const DIFF_WORKER_FACTORY = new InjectionToken<DiffWorkerFactory>('DIFF_WORKER_FACTORY', {
+  providedIn: 'root',
+  /*
+   * The `new Worker(new URL(...), { type: 'module' })` literal is what the bundler
+   * pattern-matches to emit the worker as its own chunk. Building the URL any other way
+   * — a variable, a string concatenation — silently produces a 404 at runtime.
+   */
+  factory: () => () => new Worker(new URL('./diff.worker', import.meta.url), { type: 'module' }),
+});
 
 /** Only the successful half of the response union; failures become rejections. */
 type SuccessResponse = Extract<DiffWorkerResponse, { ok: true }>;
@@ -166,7 +159,13 @@ export class DiffService implements OnDestroy {
     this.revoke(slot);
     this.objectUrls[slot] = objectUrl;
 
-    return { name: file.name, objectUrl, width: imageData.width, height: imageData.height, decodeMs };
+    return {
+      name: file.name,
+      objectUrl,
+      width: imageData.width,
+      height: imageData.height,
+      decodeMs,
+    };
   }
 
   /**
@@ -233,7 +232,10 @@ export class DiffService implements OnDestroy {
   }
 
   /** Post one request and resolve when its reply arrives. Failures become rejections. */
-  private send(request: DiffWorkerRequest, transfer: Transferable[] = []): Promise<SuccessResponse> {
+  private send(
+    request: DiffWorkerRequest,
+    transfer: Transferable[] = [],
+  ): Promise<SuccessResponse> {
     return new Promise<SuccessResponse>((resolve, reject) => {
       // Before enqueuing: if the worker cannot start, this rejects without leaving an
       // entry that would consume some later request's reply.
@@ -330,4 +332,3 @@ export class DiffService implements OnDestroy {
     }
   }
 }
-

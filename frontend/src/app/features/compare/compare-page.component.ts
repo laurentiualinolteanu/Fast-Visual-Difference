@@ -47,18 +47,8 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       text attached to a slot, never something the panel could infer from where it landed.
     -->
     <div class="panels">
-      <app-image-panel
-        label="BEFORE"
-        [image]="before()"
-        [boxes]="boxes()"
-        [stale]="stale()"
-      />
-      <app-image-panel
-        label="AFTER"
-        [image]="after()"
-        [boxes]="boxes()"
-        [stale]="stale()"
-      />
+      <app-image-panel label="BEFORE" [image]="before()" [boxes]="boxes()" [stale]="stale()" />
+      <app-image-panel label="AFTER" [image]="after()" [boxes]="boxes()" [stale]="stale()" />
     </div>
 
     <app-results-summary
@@ -85,7 +75,6 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       flex: 1 1 20rem;
       min-width: 0;
     }
-
   `,
 })
 export class ComparePageComponent {
@@ -124,7 +113,6 @@ export class ComparePageComponent {
 
   /** Click to painted boxes, in milliseconds. See `onCompare`. */
   readonly elapsedMs = signal(0);
-
 
   /**
    * Why a comparison cannot run right now, or `null` if it can.
@@ -266,6 +254,4 @@ export class ComparePageComponent {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
   }
-
 }
-

@@ -21,7 +21,9 @@ import { Box } from '../../core/diff/diff-types';
       <figcaption>
         <strong class="label">{{ label() }}</strong>
         @if (image(); as loaded) {
-          <span class="meta">{{ loaded.width }}&times;{{ loaded.height }} &middot; {{ loaded.name }}</span>
+          <span class="meta">
+            {{ loaded.width }}&times;{{ loaded.height }} &middot; {{ loaded.name }}
+          </span>
         }
       </figcaption>
 

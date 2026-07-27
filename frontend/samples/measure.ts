@@ -162,8 +162,11 @@ function measure(testCase: Case) {
 const derived = deriveParams(DEFAULT_SETTINGS.sensitivity);
 
 console.log('machine   ', `${cpus()[0].model.trim()}, ${cpus().length} threads`);
-console.log('           ', `${process.platform} ${process.arch}, node ${process.version}, ` +
-  `${Math.round(totalmem() / 1024 ** 3)} GB RAM`);
+console.log(
+  '           ',
+  `${process.platform} ${process.arch}, node ${process.version}, ` +
+    `${Math.round(totalmem() / 1024 ** 3)} GB RAM`,
+);
 console.log(
   'settings  ',
   `sensitivity ${DEFAULT_SETTINGS.sensitivity}/10 ` +
@@ -171,7 +174,10 @@ console.log(
     `min cluster ${derived.minChangedPixels} px), ` +
     `AA suppression ${DEFAULT_SETTINGS.suppressAntiAliasing ? 'on' : 'off'}`,
 );
-console.log('constants  ', `TILE ${TILE}, CELL ${CELL}, BRIDGE_CELLS ${BRIDGE_CELLS}, MERGE_GAP_PX ${MERGE_GAP_PX}`);
+console.log(
+  'constants  ',
+  `TILE ${TILE}, CELL ${CELL}, BRIDGE_CELLS ${BRIDGE_CELLS}, MERGE_GAP_PX ${MERGE_GAP_PX}`,
+);
 console.log('runs       ', `median of ${TIMED_RUNS} after ${WARMUP_RUNS} warm-up runs`);
 
 /*
