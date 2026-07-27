@@ -18,6 +18,7 @@ import { ImageDataLike } from './diff-types';
 import { deltaAt } from './pixel-metrics';
 import {
   CELL,
+  DENSITY_GUARD_RATIO,
   DerivedParams,
   SHIFT_TOLERANCE_PX,
   SUPPRESSION_MATCH_RATIO,
@@ -42,6 +43,16 @@ export interface ChangeMask {
   readonly pixelCount: Int32Array;
   readonly totalChanged: number;
   readonly changedCells: number;
+  /**
+   * More than DENSITY_GUARD_RATIO of the compared area differed, so refinement was
+   * abandoned partway through: pixels found before that point were checked for
+   * anti-aliasing and shifts, pixels found after were not.
+   *
+   * The results are therefore approximate and scan-order dependent — by design, since
+   * at this density the two images are not the same screen with an edit. The engine
+   * turns this into a user-facing warning.
+   */
+  readonly highChangeDensity: boolean;
 }
 
 /**
@@ -83,9 +94,19 @@ export function buildChangeMask(
   // See SUPPRESSION_MATCH_RATIO for why a match must beat the threshold by this margin.
   const matchThreshold = threshold * SUPPRESSION_MATCH_RATIO;
 
+  /*
+   * Density guard. Computed once as an absolute pixel count so the hot loop compares two
+   * integers instead of dividing, and floored to at least one so a tiny region cannot
+   * produce a limit of zero.
+   */
+  const densityLimit = Math.max(1, Math.floor(width * height * DENSITY_GUARD_RATIO));
+
   // Counters are locals rather than fields so the hot loop touches no object.
   let totalChanged = 0;
   let changedCells = 0;
+  let highChangeDensity = false;
+  // Starts as the caller asked, but the guard below may switch it off mid-pass.
+  let refining = suppressAntiAliasing;
 
   for (let tileY = 0; tileY < tilesY; tileY++) {
     const top = tileY * TILE;
@@ -109,7 +130,7 @@ export function buildChangeMask(
           if (deltaAt(a.data, (rowA + x) * 4, b.data, (rowB + x) * 4) <= threshold) {
             continue;
           }
-          if (suppressAntiAliasing && isExplainedByShift(a, b, x, y, matchThreshold)) {
+          if (refining && isExplainedByShift(a, b, x, y, matchThreshold)) {
             continue;
           }
 
@@ -142,6 +163,16 @@ export function buildChangeMask(
 
           pixelCount[cell]++;
           totalChanged++;
+
+          if (!highChangeDensity && totalChanged >= densityLimit) {
+            // Past this density the images are not the same screen with an edit, so
+            // refining each remaining pixel buys nothing and costs the most expensive
+            // operation in the pipeline. Note the flag even when the caller had already
+            // turned suppression off: "most of the image differs" is worth reporting
+            // either way.
+            highChangeDensity = true;
+            refining = false;
+          }
         }
       }
     }
@@ -158,6 +189,7 @@ export function buildChangeMask(
     pixelCount,
     totalChanged,
     changedCells,
+    highChangeDensity,
   };
 }
 

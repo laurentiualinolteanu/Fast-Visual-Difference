@@ -425,6 +425,91 @@ describe('buildChangeMask', () => {
     });
   });
 
+  describe('the change-density guard', () => {
+    /** Every column a distinct grey, so a one-pixel shift makes every pixel a candidate. */
+    function paintColumns(image: ImageDataLike, fromY: number, toY: number, offset: number): void {
+      for (let y = fromY; y <= toY; y++) {
+        for (let x = 0; x < image.width; x++) {
+          const source = x - offset;
+          const grey = source < 0 ? 255 : ((source + 1) * 37) % 256;
+          setPixel(image, x, y, [grey, grey, grey]);
+        }
+      }
+    }
+
+    it('trips on a uniform brightness shift and reports the whole image', () => {
+      // The engine's worst input: every pixel is a candidate, every pixel exceeds the
+      // threshold, and because the neighbourhood shifted too, nothing matches — so
+      // nothing short-circuits and every pixel would pay the full bidirectional scan.
+      const before = solidImage(64, 64, [100, 100, 100]);
+      const after = solidImage(64, 64, [130, 130, 130]);
+
+      const mask = maskFor(before, after);
+
+      expect(mask.highChangeDensity).toBeTrue();
+      expect(mask.totalChanged).toBe(64 * 64);
+    });
+
+    it('leaves an ordinary change untouched', () => {
+      // The guard must be invisible below its limit. A 6x6 edit on a 32x32 image is
+      // 3.5% of the area; results must be exactly what T05 produced.
+      const before = solidImage(32, 32);
+      const after = cloneImage(before);
+      fillRect(after, 0, 0, 6, 6, BLACK);
+
+      const mask = maskFor(before, after);
+
+      expect(mask.highChangeDensity).toBeFalse();
+      expect(mask.totalChanged).toBe(36);
+      expect(mask.changedCells).toBe(4);
+    });
+
+    it('is not tripped by a whole-image shift, because suppressed pixels do not count', () => {
+      // Every pixel differs here, but almost every one is explained as a shift and
+      // discarded. The guard counts what survives, so it correctly reads this as "two
+      // near-identical images" rather than "two different images".
+      const before = solidImage(40, 40);
+      paintColumns(before, 0, 39, 0);
+      const after = solidImage(40, 40);
+      paintColumns(after, 0, 39, 1);
+
+      const mask = maskFor(before, after);
+
+      expect(mask.highChangeDensity).toBeFalse();
+      expect(mask.totalChanged).toBe(2 * 40); // the two edge columns only
+    });
+
+    it('stops refining the pixels it finds after the limit', () => {
+      // Top half: a solid change that survives suppression, 800 pixels on a 1600 pixel
+      // image — so the limit of 400 is crossed while still inside it.
+      // Bottom half: a one-pixel shift that suppression *would* discard.
+      //
+      // Because the guard has already fired by the time the bottom is scanned, the shift
+      // is reported instead of suppressed: 1600 rather than the ~840 that refinement
+      // throughout would have produced. That difference is the guard being observable.
+      const before = solidImage(40, 40);
+      fillRect(before, 0, 0, 40, 20, BLACK);
+      paintColumns(before, 20, 39, 0);
+
+      const after = solidImage(40, 40);
+      paintColumns(after, 20, 39, 1);
+
+      const mask = maskFor(before, after);
+
+      expect(mask.highChangeDensity).toBeTrue();
+      expect(mask.totalChanged).toBe(40 * 40);
+    });
+
+    it('flags high density even when the caller disabled suppression', () => {
+      const before = solidImage(64, 64, [100, 100, 100]);
+      const after = solidImage(64, 64, [130, 130, 130]);
+
+      const mask = maskFor(before, after, withSettings({ suppressAntiAliasing: false }));
+
+      expect(mask.highChangeDensity).toBeTrue();
+    });
+  });
+
   describe('images of different widths', () => {
     // Stage 2 does its own per-image row arithmetic (`y * a.width`, `y * b.width`), so
     // the stride hazard the screener specs guard against exists here independently.

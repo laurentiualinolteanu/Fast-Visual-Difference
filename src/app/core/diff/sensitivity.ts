@@ -66,6 +66,19 @@ export const SHIFT_TOLERANCE_PX = 1;
 export const SUPPRESSION_MATCH_RATIO = 0.5;
 
 /**
+ * Fraction of the compared area that may differ before Stage 2 stops refining.
+ *
+ * Past this point the two images are not "the same screen with an edit" — they are
+ * different renders, or offset, and per-pixel suppression is both pointless and the most
+ * expensive thing the engine does. Abandoning it bounds the worst case and gives the UI
+ * something honest to say instead of a wall of boxes.
+ *
+ * A quarter is deliberately generous: a genuinely large edit (a whole panel replaced)
+ * should still get the careful treatment, and only wholesale difference should trip it.
+ */
+export const DENSITY_GUARD_RATIO = 0.25;
+
+/**
  * Stage 3 gap bridged during grouping, in cells. 2 cells = 8px.
  * Assumption: body text is 12-16px and inter-glyph gaps are under 8px, so a changed word
  * becomes one box rather than one box per stroke.
