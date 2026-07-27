@@ -1,0 +1,26 @@
+# A shorthand for one `docker run`, not orchestration.
+#
+# There is one service because there is one process, and it serves static files. No
+# database, no queue, no second container, nothing to schedule between. Compose is here
+# because `docker compose up` is shorter to type and harder to get wrong than the flags it
+# stands in for — and for no other reason.
+#
+#   docker compose up --build       then http://localhost:8080
+#
+# If this file ever grows a second service, the argument in the README for having no
+# backend has stopped being true and should be revisited rather than quietly amended.
+
+services:
+  app:
+    build: .
+    image: fast-visual-difference
+    ports:
+      - "8080:8080"
+    # The application stores nothing: the two images a user compares are read in the
+    # browser and never leave it, so the container has no reason to write to its own
+    # filesystem. Tomcat is the exception — it insists on a temp directory at startup and
+    # fails outright without one, so /tmp is mounted in memory rather than the whole
+    # filesystem being left writable.
+    read_only: true
+    tmpfs:
+      - /tmp

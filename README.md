@@ -18,9 +18,9 @@ Built with Node 22, all from `frontend/`. Also: `npm test` (236 specs) · `npm r
 `npm run samples` (redraws the samples and re-checks the claims about them) ·
 `npm run measure` (the table below).
 
-There is also an optional Maven module at the repository root — see
-[Running it as a single jar](#running-it-as-a-single-jar). It is not needed to run, build or
-test the application.
+Two optional routes exist at the repository root and neither is needed to run, build or test
+the application: [a single jar](#running-it-as-a-single-jar) (Java 21 + Maven) and
+[Docker](#running-it-in-docker) (nothing else installed).
 
 ---
 
@@ -184,6 +184,33 @@ is served by `ng serve` or by Spring Boot.**
 Maven copies `frontend/dist/fvd/browser` onto the classpath under `static/`; it does not
 invoke npm, so the two builds stay independent. The result is a 20 MB self-contained jar,
 which is convenient to hand over and is what the Docker image runs.
+
+---
+
+## Running it in Docker
+
+Optional, and the only route that needs nothing installed but Docker itself.
+
+```bash
+docker compose up --build     # http://localhost:8080
+```
+
+Or without compose:
+
+```bash
+docker build -t fast-visual-difference .
+docker run --rm -p 8080:8080 fast-visual-difference
+```
+
+The `Dockerfile` has three stages — Node builds the Angular app, Maven packages the jar,
+and a **JRE** image runs it. Only the jar crosses into the final image, so `node_modules`
+and the compilers stay behind: **228 MB** rather than well over a gigabyte. It runs as a
+non-root user.
+
+**`docker-compose.yml` is shorthand for one `docker run`, not orchestration.** There is one
+service because there is one process and it serves static files — no database, no queue,
+nothing to schedule between. The application inside is byte-identical to the one
+`npm run dev` serves, and the comparison still runs in the reviewer's browser.
 
 ---
 

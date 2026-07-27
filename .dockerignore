@@ -1,0 +1,26 @@
+# Everything the image rebuilds for itself. Copying host build output in would defeat the
+# point of a reproducible build, and node_modules is both enormous and platform-specific.
+**/node_modules
+**/dist
+**/target
+**/.angular
+
+# Version control and editor state
+.git
+.gitattributes
+.gitignore
+.editorconfig
+.vscode
+.claude
+
+# Internal design documents. Working notes, not part of the deliverable — the same
+# exclusion .gitignore makes, repeated here so they cannot reach an image either.
+Architecture_Specification.md
+Implementation_Guide.md
+Review_and_Interview_Guide.md
+Development_Backlog.md
+
+# Docker's own files are not needed inside the build context
+Dockerfile
+docker-compose.yml
+.dockerignore
