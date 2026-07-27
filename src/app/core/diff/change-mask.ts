@@ -16,7 +16,13 @@
 
 import { ImageDataLike } from './diff-types';
 import { deltaAt } from './pixel-metrics';
-import { CELL, DerivedParams, TILE } from './sensitivity';
+import {
+  CELL,
+  DerivedParams,
+  SHIFT_TOLERANCE_PX,
+  SUPPRESSION_MATCH_RATIO,
+  TILE,
+} from './sensitivity';
 import { ScreenResult, assertComparableRegion } from './tile-screener';
 
 export interface ChangeMask {
@@ -74,13 +80,8 @@ export function buildChangeMask(
 
   const { candidates, tilesX, tilesY } = screen;
   const threshold = params.colorThreshold;
-  /*
-   * A suppression match must be twice as good as the detection threshold. Deliberately
-   * conservative: we only discard a difference when the evidence that it is a shift is
-   * strong, because a wrongly suppressed pixel is an invisible false negative while a
-   * wrongly kept one is merely a box the user can see and judge.
-   */
-  const matchThreshold = threshold * 0.5;
+  // See SUPPRESSION_MATCH_RATIO for why a match must beat the threshold by this margin.
+  const matchThreshold = threshold * SUPPRESSION_MATCH_RATIO;
 
   // Counters are locals rather than fields so the hot loop touches no object.
   let totalChanged = 0;
@@ -194,7 +195,7 @@ function isExplainedByShift(
 }
 
 /**
- * Smallest distance between one pixel and any pixel in the 3x3 neighbourhood of (x, y)
+ * Smallest distance between one pixel and any pixel within SHIFT_TOLERANCE_PX of (x, y)
  * in `scan`. Argument order is irrelevant because `deltaAt` is symmetric, which is why
  * this takes a pixel and an image to search rather than a direction flag.
  */
@@ -207,10 +208,10 @@ function neighbourhoodMin(
 ): number {
   // Clamped to the *scanned* image's own bounds. The two images need not be the same
   // size, and clamping to the wrong one would read across into the next row.
-  const firstY = Math.max(0, y - 1);
-  const lastY = Math.min(scan.height - 1, y + 1);
-  const firstX = Math.max(0, x - 1);
-  const lastX = Math.min(scan.width - 1, x + 1);
+  const firstY = Math.max(0, y - SHIFT_TOLERANCE_PX);
+  const lastY = Math.min(scan.height - 1, y + SHIFT_TOLERANCE_PX);
+  const firstX = Math.max(0, x - SHIFT_TOLERANCE_PX);
+  const lastX = Math.min(scan.width - 1, x + SHIFT_TOLERANCE_PX);
 
   let best = Infinity;
 

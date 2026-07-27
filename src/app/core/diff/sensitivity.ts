@@ -45,6 +45,27 @@ export const TILE = 8;
 export const CELL = 4;
 
 /**
+ * Radius of the Stage 2 suppression neighbourhood, in pixels. 1 gives the 3x3 scan.
+ *
+ * This is the shift the engine forgives. Raising it to 2 would tolerate two-pixel
+ * movement, but it would also erase genuinely thin features — a 2px-wide line moved
+ * anywhere within the window becomes invisible — and it more than doubles the cost of
+ * the most expensive operation in the pipeline. 1 is the smallest radius that covers
+ * anti-aliasing and font-hinting jitter, which is what this exists for.
+ */
+export const SHIFT_TOLERANCE_PX = 1;
+
+/**
+ * How much better than the detection threshold a neighbouring pixel must match before a
+ * difference is dismissed as a shift, as a fraction of that threshold.
+ *
+ * Deliberately conservative at half: we discard a difference only on strong evidence,
+ * because a wrongly suppressed pixel is an invisible false negative while a wrongly kept
+ * one is merely a box the user can see and judge for themselves.
+ */
+export const SUPPRESSION_MATCH_RATIO = 0.5;
+
+/**
  * Stage 3 gap bridged during grouping, in cells. 2 cells = 8px.
  * Assumption: body text is 12-16px and inter-glyph gaps are under 8px, so a changed word
  * becomes one box rather than one box per stroke.

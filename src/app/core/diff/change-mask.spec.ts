@@ -37,7 +37,13 @@ function withSettings(overrides: Partial<DiffSettings>): DiffSettings {
   return { ...DEFAULT_SETTINGS, ...overrides };
 }
 
-/** Every changed pixel's x coordinate, read back from the per-cell extents. */
+/**
+ * Columns *spanned* by the changed cells' extents.
+ *
+ * Not literally every changed pixel's x: the mask keeps per-cell bounds, not per-pixel
+ * data, so a cell whose only changes are at x=0 and x=3 reports 1 and 2 as well. Exact
+ * for fixtures whose changes form contiguous columns, which is every fixture here.
+ */
 function changedColumns(mask: ChangeMask): Set<number> {
   const columns = new Set<number>();
   for (let i = 0; i < mask.changed.length; i++) {
@@ -269,6 +275,49 @@ describe('buildChangeMask', () => {
         }
       }
     }
+
+    /**
+     * A vertical edge with one column of intermediate coverage — what anti-aliasing
+     * actually looks like: solid on the left, a partial pixel, solid on the right.
+     */
+    function paintAntiAliasedEdge(image: ImageDataLike, edgeX: number, coverage: number): void {
+      for (let y = 0; y < image.height; y++) {
+        for (let x = 0; x < image.width; x++) {
+          const grey = x < edgeX ? 0 : x === edgeX ? coverage : 255;
+          setPixel(image, x, y, [grey, grey, grey]);
+        }
+      }
+    }
+
+    it('suppresses an anti-aliased edge that moved by one pixel', () => {
+      // The feature's namesake case, and the artefact that actually dominates in
+      // practice: font hinting and sub-pixel layout move an edge, so the same coverage
+      // values reappear one column over. Every value has an exact match one pixel away
+      // in both directions, so the whole edge is dismissed.
+      const before = solidImage(32, 32);
+      paintAntiAliasedEdge(before, 16, 128);
+      const after = solidImage(32, 32);
+      paintAntiAliasedEdge(after, 17, 128);
+
+      expect(maskFor(before, after).totalChanged).toBe(0);
+    });
+
+    it('reports an edge whose coverage changed without moving', () => {
+      // The boundary of the feature, asserted rather than assumed. The edge is in the
+      // same place but rendered differently (128 -> 100); no neighbour holds the new
+      // value, so nothing explains it as a shift and it is reported. That is the right
+      // call — a differently rendered edge is a real visual difference — but it means
+      // "anti-aliasing suppression" forgives *movement*, not every rendering change.
+      const before = solidImage(32, 32);
+      paintAntiAliasedEdge(before, 16, 128);
+      const after = solidImage(32, 32);
+      paintAntiAliasedEdge(after, 16, 100);
+
+      const mask = maskFor(before, after);
+
+      expect(changedColumns(mask)).toEqual(new Set([16]));
+      expect(mask.totalChanged).toBe(32);
+    });
 
     it('keeps a single added pixel — the case a one-way check would lose', () => {
       // Test 5b, and the reason the check is bidirectional. Forward finds a match: the
