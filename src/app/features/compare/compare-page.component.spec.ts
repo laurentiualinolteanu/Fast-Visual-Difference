@@ -89,11 +89,12 @@ describe('ComparePageComponent', () => {
   let fixture: ComponentFixture<ComparePageComponent>;
   let page: ComparePageComponent;
   let service: FakeDiffService;
+  let logged: jasmine.Spy;
 
   beforeEach(() => {
-    // The page logs each result until T16 replaces that with a structured line. These
+    // Every completed run emits one structured line (see `core/log-diff-run.ts`). These
     // specs have no interest in it, and left alone it buries the suite output.
-    spyOn(console, 'log');
+    logged = spyOn(console, 'info');
 
     service = new FakeDiffService();
 
@@ -299,6 +300,27 @@ describe('ComparePageComponent', () => {
       // two animation frames it waits for, which is the interval the markers bracket.
       expect(page.elapsedMs()).toBeGreaterThan(0);
       expect(page.elapsedMs()).toBeGreaterThanOrEqual(page.result()!.timings.totalMs);
+    });
+
+    it('emits exactly one structured line per completed run', async () => {
+      // The tuning instrument T20 reads. One line per run, carrying the settings it was
+      // produced under — a timing without its sensitivity is an anecdote, not a datum.
+      await loadBothAndCompare();
+
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.calls.mostRecent().args[0]).toContain('[diff]');
+      expect(logged.calls.mostRecent().args[0]).toContain('sensitivity 6');
+    });
+
+    it('logs nothing when the comparison failed', async () => {
+      await load('before');
+      await load('after');
+
+      const comparing = page.onCompare();
+      service.rejectCompare('boom');
+      await comparing;
+
+      expect(logged).not.toHaveBeenCalled();
     });
 
     it('reports a failure and stays usable', async () => {

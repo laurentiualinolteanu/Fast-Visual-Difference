@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 
 import { ControlsBarComponent } from './controls-bar.component';
 import { ImagePanelComponent } from './image-panel.component';
+import { ResultsSummaryComponent } from './results-summary.component';
 import { DiffService, ImageSlot, LoadedImage } from '../../core/diff.service';
+import { logDiffRun } from '../../core/log-diff-run';
 import { DiffResult, DiffSettings } from '../../core/diff/diff-types';
 import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
 
@@ -17,7 +19,7 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
  */
 @Component({
   selector: 'app-compare-page',
-  imports: [ControlsBarComponent, ImagePanelComponent],
+  imports: [ControlsBarComponent, ImagePanelComponent, ResultsSummaryComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-controls-bar
@@ -53,22 +55,13 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       />
     </div>
 
-    @if (result(); as diff) {
-      <section class="results">
-        <p>
-          {{ diff.boxes.length }} difference{{ diff.boxes.length === 1 ? '' : 's' }} &middot;
-          engine {{ round(diff.timings.totalMs) }} ms &middot;
-          click to paint {{ round(elapsedMs()) }} ms
-          @if (stale()) {
-            <em>(settings changed — re-run to update)</em>
-          }
-        </p>
-
-        @for (warning of diff.warnings; track warning) {
-          <p class="warning">{{ warning }}</p>
-        }
-      </section>
-    }
+    <app-results-summary
+      [result]="result()"
+      [before]="before()"
+      [after]="after()"
+      [elapsedMs]="elapsedMs()"
+      [stale]="stale()"
+    />
   `,
   styles: `
     :host {
@@ -85,19 +78,6 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
     app-image-panel {
       flex: 1 1 20rem;
       min-width: 0;
-    }
-
-    .results {
-      margin-top: 1rem;
-      font-size: 0.9rem;
-    }
-
-    .results p {
-      margin: 0.25rem 0;
-    }
-
-    .warning {
-      color: var(--p-amber-700, #b45309);
     }
 
     .error {
@@ -199,8 +179,14 @@ export class ComparePageComponent {
 
       this.elapsedMs.set(performance.now() - startedAt);
 
-      // T16 replaces this with one structured line from `core/log-diff-run.ts`.
-      console.log('Diff result', result);
+      logDiffRun(result, {
+        settings: this.settings(),
+        elapsedMs: this.elapsedMs(),
+        decodeMs: {
+          before: this.before()?.decodeMs ?? 0,
+          after: this.after()?.decodeMs ?? 0,
+        },
+      });
     } catch (failure) {
       this.errorMessage.set(messageOf(failure));
     } finally {
@@ -257,9 +243,6 @@ export class ComparePageComponent {
     );
   }
 
-  protected round(value: number): number {
-    return Math.round(value);
-  }
 }
 
 function messageOf(failure: unknown): string {
