@@ -103,6 +103,96 @@ describe('BoxOverlayComponent', () => {
     });
   });
 
+  describe('the minimum on-screen size', () => {
+    /**
+     * Render at a known display width so the scale is known.
+     *
+     * A 4000px-wide image shown at 400px is a scale of 10, so the 10px minimum becomes
+     * 100 natural units — the case from the backlog, with round numbers.
+     */
+    async function renderScaled(boxes: Box[], natural = 4000, displayed = 400) {
+      fixture.nativeElement.style.display = 'block';
+      fixture.nativeElement.style.width = `${displayed}px`;
+      fixture.nativeElement.style.height = `${displayed * 0.75}px`;
+
+      const svg = render(boxes, natural, natural * 0.75);
+
+      // ResizeObserver reports on a later frame than the one that sized the host.
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      fixture.detectChanges();
+
+      return svg;
+    }
+
+    it('enlarges a change too small to see, keeping it on the same spot', async () => {
+      // A single changed pixel, padded by the engine to 5x5, on a 4000px image.
+      const svg = await renderScaled([box({ x: 1000, y: 800, width: 5, height: 5 })]);
+      const [rect] = rects(svg, 'strokes');
+
+      // 10 display px x scale 10 = 100 natural units.
+      expect(Number(rect.getAttribute('width'))).toBe(100);
+      expect(Number(rect.getAttribute('height'))).toBe(100);
+
+      // Centred on the original, so it still marks where the change is.
+      expect(Number(rect.getAttribute('x'))).toBe(1000 + 2.5 - 50);
+      expect(Number(rect.getAttribute('y'))).toBe(800 + 2.5 - 50);
+    });
+
+    it('leaves a box that is already big enough exactly as the engine emitted it', async () => {
+      const svg = await renderScaled([box({ x: 40, y: 60, width: 300, height: 220 })]);
+      const [rect] = rects(svg, 'strokes');
+
+      expect(rect.getAttribute('x')).toBe('40');
+      expect(rect.getAttribute('y')).toBe('60');
+      expect(rect.getAttribute('width')).toBe('300');
+      expect(rect.getAttribute('height')).toBe('220');
+    });
+
+    it('enlarges the halo identically, so it still surrounds its stroke', async () => {
+      // Both passes read one derived list. Inflating only one would draw a halo that no
+      // longer contains the box it exists to separate from the picture.
+      const svg = await renderScaled([box({ x: 1000, y: 800, width: 5, height: 5 })]);
+      const geometry = (rect: SVGRectElement) =>
+        ['x', 'y', 'width', 'height'].map((name) => rect.getAttribute(name));
+
+      expect(geometry(rects(svg, 'halos')[0])).toEqual(geometry(rects(svg, 'strokes')[0]));
+    });
+
+    it('keeps an enlarged box at the edge inside the picture', async () => {
+      // Otherwise half the box falls outside the viewBox and is clipped, drawing a stroke
+      // on three sides — which reads as a rendering fault rather than an edge change.
+      const svg = await renderScaled([box({ x: 0, y: 0, width: 3, height: 3 })]);
+      const [rect] = rects(svg, 'strokes');
+
+      expect(Number(rect.getAttribute('x'))).toBe(0);
+      expect(Number(rect.getAttribute('y'))).toBe(0);
+      expect(Number(rect.getAttribute('width'))).toBe(100);
+    });
+
+    it('recalculates when the panel is resized', async () => {
+      const small = box({ x: 1000, y: 800, width: 5, height: 5 });
+
+      await renderScaled([small], 4000, 400);
+      expect(Number(rects(fixture.nativeElement.querySelector('svg'), 'strokes')[0].getAttribute('width'))).toBe(100);
+
+      // Twice as wide on screen: half the scale, so half the natural minimum.
+      fixture.nativeElement.style.width = '800px';
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      fixture.detectChanges();
+
+      expect(Number(rects(fixture.nativeElement.querySelector('svg'), 'strokes')[0].getAttribute('width'))).toBe(50);
+    });
+
+    it('draws boxes at engine size until it has been measured', async () => {
+      // The host has no layout in this case, so there is no scale to apply. Natural size
+      // is the honest fallback: correct, merely not yet enlarged.
+      const svg = render([box({ x: 10, y: 20, width: 3, height: 3 })], 4000, 3000);
+      const [rect] = rects(svg, 'strokes');
+
+      expect(rect.getAttribute('width')).toBe('3');
+    });
+  });
+
   describe('how it behaves on the page', () => {
     it('keeps the stroke width in device pixels rather than image pixels', () => {
       const svg = render([box()]);

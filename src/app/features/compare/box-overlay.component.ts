@@ -1,6 +1,27 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 
 import { Box } from '../../core/diff/diff-types';
+
+/**
+ * Smallest a box may appear on screen, in CSS pixels.
+ *
+ * A 1-pixel change on a 4000-pixel-wide screenshot shown at 600px is a sixth of a pixel
+ * of box — a correct detection that reads as a miss. Ten pixels is small enough not to
+ * misrepresent the size of the change and large enough to see and to click towards.
+ */
+export const MIN_BOX_DISPLAY_PX = 10;
+
+/** A box as it will be drawn. Same coordinate space as `Box`; possibly enlarged. */
+type RenderedBox = Pick<Box, 'x' | 'y' | 'width' | 'height' | 'kind'>;
 
 /**
  * Draws the difference boxes over an image.
@@ -38,7 +59,7 @@ import { Box } from '../../core/diff/diff-types';
         over the previous box's coloured stroke. Every halo goes underneath every stroke.
       -->
       <g class="halos">
-        @for (box of boxes(); track $index) {
+        @for (box of renderedBoxes(); track $index) {
           <rect
             [attr.x]="box.x"
             [attr.y]="box.y"
@@ -50,7 +71,7 @@ import { Box } from '../../core/diff/diff-types';
       </g>
 
       <g class="strokes">
-        @for (box of boxes(); track $index) {
+        @for (box of renderedBoxes(); track $index) {
           <rect
             [attr.class]="box.kind"
             [attr.x]="box.x"
@@ -125,4 +146,89 @@ export class BoxOverlayComponent {
    */
   readonly width = input.required<number>();
   readonly height = input.required<number>();
+
+  /**
+   * The width this overlay currently occupies on screen, in CSS pixels.
+   *
+   * Measured from this component's own host, which T14 sizes to exactly the picture area
+   * — the same fact the panel's alignment specs assert. Zero until the first observation,
+   * which simply means boxes render at their natural size for one frame.
+   */
+  private readonly displayedWidth = signal(0);
+
+  /**
+   * The boxes as drawn: engine geometry, with anything too small to see enlarged.
+   *
+   * Both the halo pass and the stroke pass read this one list. Inflating in the template
+   * instead would mean doing it twice, and a halo that stopped surrounding its stroke is
+   * the kind of defect that looks like a rendering glitch rather than a bug.
+   *
+   * **The display scale multiplies exactly one quantity: the minimum size.** It converts
+   * "ten pixels on screen" into natural image units. No coordinate is ever multiplied by
+   * it — every x and y below is arithmetic on natural units alone. That is what keeps the
+   * coordinate logic free of `displayed / natural` ratios, and it is checkable by reading
+   * the one line where `scale` appears.
+   */
+  protected readonly renderedBoxes = computed<RenderedBox[]>(() => {
+    const boxes = this.boxes();
+    const displayed = this.displayedWidth();
+    const natural = this.width();
+
+    if (displayed <= 0 || natural <= 0) {
+      return boxes;
+    }
+
+    const scale = natural / displayed;
+    const minimumSize = MIN_BOX_DISPLAY_PX * scale;
+
+    return boxes.map((box) => enlargeToMinimum(box, minimumSize, natural, this.height()));
+  });
+
+  constructor() {
+    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+
+    // Resize, browser zoom and panel reflow all change the scale, and all of them arrive
+    // here. Measuring once on load would leave the boxes wrong after the first resize.
+    const observer = new ResizeObserver(([entry]) =>
+      this.displayedWidth.set(entry.contentRect.width),
+    );
+    observer.observe(host);
+
+    inject(DestroyRef).onDestroy(() => observer.disconnect());
+  }
+}
+
+/**
+ * Grow a box to at least `minimumSize` in each axis, about its own centre, without
+ * leaving the image.
+ *
+ * Centred so the box still marks the place it described. Clamped so a change at the very
+ * edge of the picture does not end up half outside the viewBox, where it would be drawn
+ * with a stroke on three sides.
+ */
+function enlargeToMinimum(
+  box: Box,
+  minimumSize: number,
+  imageWidth: number,
+  imageHeight: number,
+): RenderedBox {
+  if (box.width >= minimumSize && box.height >= minimumSize) {
+    return box;
+  }
+
+  const width = Math.max(box.width, minimumSize);
+  const height = Math.max(box.height, minimumSize);
+
+  return {
+    x: clamp(box.x + box.width / 2 - width / 2, 0, imageWidth - width),
+    y: clamp(box.y + box.height / 2 - height / 2, 0, imageHeight - height),
+    width,
+    height,
+    kind: box.kind,
+  };
+}
+
+function clamp(value: number, low: number, high: number): number {
+  // `high` can fall below `low` when a box is wider than the image it sits on.
+  return Math.max(low, Math.min(value, Math.max(low, high)));
 }
