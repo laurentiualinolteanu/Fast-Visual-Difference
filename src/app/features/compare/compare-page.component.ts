@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 
+import { BoxOverlayComponent } from './box-overlay.component';
 import { DiffService, ImageSlot, LoadedImage } from '../../core/diff.service';
 import { DiffResult, DiffSettings } from '../../core/diff/diff-types';
 import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
@@ -16,7 +17,7 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
  */
 @Component({
   selector: 'app-compare-page',
-  imports: [ButtonModule],
+  imports: [BoxOverlayComponent, ButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="controls">
@@ -84,7 +85,20 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
           </figcaption>
 
           @if (panel.image; as image) {
-            <img [src]="image.objectUrl" [alt]="panel.label" />
+            <!--
+              The frame hugs the image exactly so the overlay, which is inset to all four
+              of its edges, lines up with it. A plain block wrapper would be the full
+              width of the panel while an image narrower than the panel would not, and
+              every box would sit that difference to the left of where it belongs.
+            -->
+            <div class="frame">
+              <img [src]="image.objectUrl" [alt]="panel.label" />
+              <app-box-overlay
+                [boxes]="boxes()"
+                [width]="image.width"
+                [height]="image.height"
+              />
+            </div>
           } @else {
             <p class="empty">Choose an image above.</p>
           }
@@ -154,12 +168,24 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       margin-bottom: 0.25rem;
     }
 
+    .frame {
+      position: relative;
+      display: block;
+      /* Shrink to the image's used width, whether that is its natural size or the
+         panel width — the overlay is inset to this element's edges. */
+      width: fit-content;
+      max-width: 100%;
+      /* The border belongs here, not on the image: an absolutely positioned overlay
+         inset to zero resolves against this element's padding box, so a border on the
+         image itself would leave the overlay 2px wider than the pixels it describes.
+         Fallback colour — the app must not depend on a PrimeNG token name resolving. */
+      border: 1px solid var(--p-content-border-color, #e2e8f0);
+    }
+
     .panel img {
       display: block;
       max-width: 100%;
       height: auto;
-      /* Fallbacks: the app must not depend on a PrimeNG token name resolving. */
-      border: 1px solid var(--p-content-border-color, #e2e8f0);
     }
 
     .empty {
