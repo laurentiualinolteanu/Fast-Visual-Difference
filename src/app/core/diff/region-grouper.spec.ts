@@ -2,7 +2,7 @@ import { buildChangeMask } from './change-mask';
 import { Box, DiffSettings, ImageDataLike } from './diff-types';
 import { groupRegions } from './region-grouper';
 import { BRIDGE_CELLS, CELL, DEFAULT_SETTINGS, deriveParams } from './sensitivity';
-import { BLACK, cloneImage, fillRect, setPixel, solidImage } from './test-support';
+import { BLACK, cloneImage, fillRect, setPixel, solidImage, withSettings } from './test-support';
 import { screenTiles } from './tile-screener';
 
 /**
@@ -39,19 +39,21 @@ function pair(width: number, height: number, edit: (after: ImageDataLike) => voi
   return { before, after };
 }
 
-function withSettings(overrides: Partial<DiffSettings>): DiffSettings {
-  return { ...DEFAULT_SETTINGS, ...overrides };
-}
-
 describe('groupRegions', () => {
   describe('separating and joining', () => {
-    it('keeps distant changes apart', () => {
+    it('keeps distant changes apart, each with its own bounds', () => {
       const { before, after } = pair(200, 200, (image) => {
         setPixel(image, 20, 20, BLACK);
         setPixel(image, 150, 20, BLACK);
       });
 
-      expect(regionsFor(before, after).length).toBe(2);
+      // Asserting both boxes rather than just the count: accumulators declared outside
+      // the outer loop would still produce two regions, but the second would inherit the
+      // first's bounds. This also pins the documented raster ordering.
+      expect(regionsFor(before, after)).toEqual([
+        { x: 20, y: 20, width: 1, height: 1, changedPixels: 1, kind: 'change' },
+        { x: 150, y: 20, width: 1, height: 1, changedPixels: 1, kind: 'change' },
+      ]);
     });
 
     it('joins changes that are close together', () => {

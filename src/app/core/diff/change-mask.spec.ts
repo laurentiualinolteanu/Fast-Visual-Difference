@@ -8,6 +8,7 @@ import {
   paintRowGradient,
   setPixel,
   solidImage,
+  withSettings,
 } from './test-support';
 import { ScreenResult, screenTiles } from './tile-screener';
 
@@ -30,11 +31,6 @@ function maskFor(
     deriveParams(settings.sensitivity),
     settings.suppressAntiAliasing,
   );
-}
-
-/** The default settings with one field overridden. */
-function withSettings(overrides: Partial<DiffSettings>): DiffSettings {
-  return { ...DEFAULT_SETTINGS, ...overrides };
 }
 
 /**

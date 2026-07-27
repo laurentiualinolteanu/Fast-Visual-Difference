@@ -62,18 +62,12 @@ export function groupRegions(mask: ChangeMask, minChangedPixels: number): Box[] 
     while (stackSize > 0) {
       const cell = stack[--stackSize];
 
-      if (mask.minX[cell] < minX) {
-        minX = mask.minX[cell];
-      }
-      if (mask.minY[cell] < minY) {
-        minY = mask.minY[cell];
-      }
-      if (mask.maxX[cell] > maxX) {
-        maxX = mask.maxX[cell];
-      }
-      if (mask.maxY[cell] > maxY) {
-        maxY = mask.maxY[cell];
-      }
+      // Runs per cell, not per pixel, so clarity beats the hand-rolled conditionals
+      // the per-pixel loop in change-mask.ts uses.
+      minX = Math.min(minX, mask.minX[cell]);
+      minY = Math.min(minY, mask.minY[cell]);
+      maxX = Math.max(maxX, mask.maxX[cell]);
+      maxY = Math.max(maxY, mask.maxY[cell]);
       changedPixels += mask.pixelCount[cell];
 
       // Scan a (2 * BRIDGE_CELLS + 1)^2 window rather than the immediate eight
@@ -117,19 +111,31 @@ export function groupRegions(mask: ChangeMask, minChangedPixels: number): Box[] 
 }
 
 /**
- * The mask's arrays must match its stated grid.
+ * *Every* one of the mask's arrays must match its stated grid — checking only `changed`
+ * would advertise a guarantee this does not give.
  *
- * A short array would read `undefined`, which compares as neither 1 nor 0 in the ways
- * this walk relies on — cells would be quietly treated as unchanged and whole regions
- * would go missing, with no error to explain it.
+ * Each array fails differently and all of them fail quietly. A short `changed` leaves
+ * cells looking unchanged, so whole regions vanish. A short `pixelCount` yields
+ * `undefined`, so `changedPixels` becomes `NaN` — and `NaN < minChangedPixels` is false,
+ * so the size filter silently stops working. Short extent arrays leave the bounds
+ * untouched, so the box is simply the wrong size with nothing to say so.
  */
 function assertMaskIsConsistent(mask: ChangeMask): void {
   const expected = mask.cellsX * mask.cellsY;
+  const grid = `${mask.cellsX}x${mask.cellsY}`;
 
-  if (mask.changed.length !== expected) {
+  assertGridSized('changed', mask.changed.length, expected, grid);
+  assertGridSized('minX', mask.minX.length, expected, grid);
+  assertGridSized('minY', mask.minY.length, expected, grid);
+  assertGridSized('maxX', mask.maxX.length, expected, grid);
+  assertGridSized('maxY', mask.maxY.length, expected, grid);
+  assertGridSized('pixelCount', mask.pixelCount.length, expected, grid);
+}
+
+function assertGridSized(name: string, actual: number, expected: number, grid: string): void {
+  if (actual !== expected) {
     throw new Error(
-      `Change mask holds ${mask.changed.length} cells, but its ` +
-        `${mask.cellsX}x${mask.cellsY} grid needs ${expected}`,
+      `Change mask '${name}' holds ${actual} cells, but its ${grid} grid needs ${expected}`,
     );
   }
 }
