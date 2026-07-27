@@ -26,16 +26,24 @@ type RenderedBox = Pick<Box, 'x' | 'y' | 'width' | 'height' | 'kind'>;
 /**
  * Draws the difference boxes over an image.
  *
- * The component performs no coordinate arithmetic of any kind. The `viewBox` is the
- * image's natural pixel size and the boxes are emitted at their engine coordinates
- * verbatim; the browser maps that space onto whatever the image is currently displayed
- * at. Window resizes, browser zoom, a panel that reflows — all handled by the same
- * mechanism that scales the image itself, so the boxes cannot drift out of alignment
- * without the image drifting too.
+ * **No box position is ever multiplied by a display ratio.** The `viewBox` is the image's
+ * natural pixel size and every coordinate below is arithmetic on natural units alone; the
+ * browser maps that space onto whatever the image is currently displayed at. Window
+ * resizes, browser zoom, a panel that reflows — all handled by the same mechanism that
+ * scales the image itself, so the boxes cannot drift out of alignment without the image
+ * drifting with them.
  *
- * The alternative — reading `clientWidth`, computing `displayed / natural` and multiplying
- * every coordinate — is correct only as long as every code path that changes the layout
- * remembers to recompute. This one is correct by construction.
+ * The usual alternative — reading `clientWidth`, computing `displayed / natural`, and
+ * multiplying every coordinate through it — is correct only for as long as every code
+ * path that changes the layout remembers to recompute. This one is correct by
+ * construction.
+ *
+ * There is one display measurement, added for the minimum on-screen box size, and it is
+ * worth being exact about what it does. A box a few pixels across on a 4000px screenshot
+ * is drawn sub-pixel: a correct detection that reads as a miss. So the scale converts
+ * `MIN_BOX_DISPLAY_PX` from screen pixels into natural units, and that number is used to
+ * *enlarge* boxes that would be invisible. It is never applied to an x or a y. Two lines
+ * mention `scale`; both are in `renderedBoxes`, and neither produces a position.
  */
 @Component({
   selector: 'app-box-overlay',

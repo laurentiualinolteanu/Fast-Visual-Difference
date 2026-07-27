@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { BoxOverlayComponent } from './box-overlay.component';
+import { BoxOverlayComponent, MIN_BOX_DISPLAY_PX } from './box-overlay.component';
 import { Box } from '../../core/diff/diff-types';
 
 /**
@@ -129,13 +129,25 @@ describe('BoxOverlayComponent', () => {
       const svg = await renderScaled([box({ x: 1000, y: 800, width: 5, height: 5 })]);
       const [rect] = rects(svg, 'strokes');
 
-      // 10 display px x scale 10 = 100 natural units.
-      expect(Number(rect.getAttribute('width'))).toBe(100);
-      expect(Number(rect.getAttribute('height'))).toBe(100);
+      // Scale is 4000/400 = 10, so the minimum is that many natural units per screen px.
+      const expected = MIN_BOX_DISPLAY_PX * 10;
+      expect(Number(rect.getAttribute('width'))).toBe(expected);
+      expect(Number(rect.getAttribute('height'))).toBe(expected);
 
       // Centred on the original, so it still marks where the change is.
-      expect(Number(rect.getAttribute('x'))).toBe(1000 + 2.5 - 50);
-      expect(Number(rect.getAttribute('y'))).toBe(800 + 2.5 - 50);
+      expect(Number(rect.getAttribute('x'))).toBe(1000 + 2.5 - expected / 2);
+      expect(Number(rect.getAttribute('y'))).toBe(800 + 2.5 - expected / 2);
+    });
+
+    it('draws it at the minimum size on screen, which is the requirement in its own units', async () => {
+      // Every other assertion here is in natural units — the output of the conversion.
+      // This one reads the rendered geometry back in screen pixels, which is what
+      // "clearly visible without zooming" actually means.
+      const svg = await renderScaled([box({ x: 1000, y: 800, width: 5, height: 5 })]);
+      const onScreen = rects(svg, 'strokes')[0].getBoundingClientRect();
+
+      expect(onScreen.width).toBeCloseTo(MIN_BOX_DISPLAY_PX, 0);
+      expect(onScreen.height).toBeCloseTo(MIN_BOX_DISPLAY_PX, 0);
     });
 
     it('leaves a box that is already big enough exactly as the engine emitted it', async () => {
@@ -166,21 +178,24 @@ describe('BoxOverlayComponent', () => {
 
       expect(Number(rect.getAttribute('x'))).toBe(0);
       expect(Number(rect.getAttribute('y'))).toBe(0);
-      expect(Number(rect.getAttribute('width'))).toBe(100);
+      expect(Number(rect.getAttribute('width'))).toBe(MIN_BOX_DISPLAY_PX * 10);
     });
 
     it('recalculates when the panel is resized', async () => {
-      const small = box({ x: 1000, y: 800, width: 5, height: 5 });
+      const drawnWidth = () =>
+        Number(
+          rects(fixture.nativeElement.querySelector('svg'), 'strokes')[0].getAttribute('width'),
+        );
 
-      await renderScaled([small], 4000, 400);
-      expect(Number(rects(fixture.nativeElement.querySelector('svg'), 'strokes')[0].getAttribute('width'))).toBe(100);
+      await renderScaled([box({ x: 1000, y: 800, width: 5, height: 5 })], 4000, 400);
+      expect(drawnWidth()).toBe(MIN_BOX_DISPLAY_PX * 10);
 
       // Twice as wide on screen: half the scale, so half the natural minimum.
       fixture.nativeElement.style.width = '800px';
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       fixture.detectChanges();
 
-      expect(Number(rects(fixture.nativeElement.querySelector('svg'), 'strokes')[0].getAttribute('width'))).toBe(50);
+      expect(drawnWidth()).toBe(MIN_BOX_DISPLAY_PX * 5);
     });
 
     it('draws boxes at engine size until it has been measured', async () => {
