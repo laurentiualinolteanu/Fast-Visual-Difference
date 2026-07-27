@@ -41,6 +41,7 @@ export function mergeAndFinalise(
 
   let gap = MERGE_GAP_PX;
   let merged = mergeAtGap(regions, gap);
+  const countAtDefaultGap = merged.length;
 
   /*
    * Still too many? Widen the gap and merge again — from the previous result rather than
@@ -52,8 +53,15 @@ export function mergeAndFinalise(
     merged = mergeAtGap(merged, gap);
   }
 
-  if (gap !== MERGE_GAP_PX) {
-    warnings.push(`High change density — boxes coarsened (merge gap ${gap}px).`);
+  /*
+   * Warn only if widening the gap actually joined something. Testing `gap` alone would
+   * report coarsening whenever the escalation *ran* — and on regions spread further
+   * apart than the widest gap, it runs four times and changes nothing. Claiming boxes
+   * were coarsened when they are identical costs the user's trust in the warning below,
+   * which is true.
+   */
+  if (merged.length < countAtDefaultGap) {
+    warnings.push(`Too many separate regions — merged more aggressively (gap ${gap}px).`);
   }
 
   const padded = merged.map((box) => pad(box, width, height)).sort(byProminence);
@@ -126,7 +134,14 @@ function isWithinGap(p: Box, q: Box, gap: number): boolean {
   return dx <= gap && dy <= gap;
 }
 
-/** Smallest box containing both. Changed-pixel counts add; the empty gap contributes none. */
+/**
+ * Smallest box containing both. Changed-pixel counts add; the empty gap contributes none.
+ *
+ * The result is always a `change` box, which relies on a precondition: only Stage 3
+ * regions reach this stage, and those are all `change`. The `size` boxes for a dimension
+ * mismatch are appended by the engine *after* merging, precisely so they are never
+ * merged into a neighbouring change.
+ */
 function union(p: Box, q: Box): Box {
   const x = Math.min(p.x, q.x);
   const y = Math.min(p.y, q.y);

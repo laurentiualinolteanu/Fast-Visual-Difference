@@ -169,6 +169,13 @@ describe('mergeAndFinalise', () => {
 
       expect(boxes.length).toBeLessThanOrEqual(MAX_BOXES);
       expect(warnings.some((warning) => warning.includes('dropped 4800'))).toBeTrue();
+
+      // ...and it must *not* claim to have merged more aggressively. These regions are
+      // 250px apart, beyond every gap the escalation reaches, so the escalation ran four
+      // times and joined nothing. Warning about coarsening that did not happen would
+      // undermine the truncation warning, which is real.
+      expect(warnings.some((warning) => warning.includes('merged more aggressively'))).toBeFalse();
+      expect(warnings.length).toBe(1);
     });
 
     it('keeps the largest boxes when it truncates', () => {
@@ -181,14 +188,16 @@ describe('mergeAndFinalise', () => {
       expect(boxes[0].width).toBe(100 + 2 * BOX_PADDING_PX);
     });
 
-    it('warns when it had to coarsen, even if that avoided truncating', () => {
-      // Spaced so the first escalation joins them: the count comes back under the cap,
-      // but the boxes are no longer what the default gap would have produced.
+    it('warns when widening the gap did join things, even if that avoided truncating', () => {
+      // Spaced 20px apart: no merge at the default gap of 8, but the first escalation to
+      // 24 joins them. The count comes back under the cap, and the boxes really are not
+      // what the default gap would have produced — so the warning is earned.
       const regions = scatteredRegions(300, 20);
       const { boxes, warnings } = finalise(regions, 20000, 20000);
 
       expect(boxes.length).toBeLessThanOrEqual(MAX_BOXES);
-      expect(warnings.some((warning) => warning.includes('coarsened'))).toBeTrue();
+      expect(warnings.some((warning) => warning.includes('merged more aggressively'))).toBeTrue();
+      expect(warnings.some((warning) => warning.includes('dropped'))).toBeFalse();
     });
 
     it('says nothing when the result fits comfortably', () => {
