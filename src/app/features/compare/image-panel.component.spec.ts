@@ -111,16 +111,16 @@ describe('ImagePanelComponent', () => {
     it('says what to do, naming the slot', () => {
       render(null);
 
-      expect(host.querySelector('.empty')?.textContent).toContain('Choose a BEFORE image');
+      expect(host.querySelector('.empty')?.textContent).toContain('Choose the BEFORE image');
     });
 
-    it('reads correctly for a label starting with a vowel', () => {
+    it('names whichever slot it was given', () => {
       fixture.componentRef.setInput('label', 'AFTER');
       fixture.componentRef.setInput('image', null);
       fixture.componentRef.setInput('boxes', []);
       fixture.detectChanges();
 
-      expect(host.querySelector('.empty')?.textContent).toContain('Choose an AFTER image');
+      expect(host.querySelector('.empty')?.textContent).toContain('Choose the AFTER image');
     });
   });
 

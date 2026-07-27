@@ -37,15 +37,14 @@ import { Box } from '../../core/diff/diff-types';
           <app-box-overlay [boxes]="boxes()" [width]="loaded.width" [height]="loaded.height" />
         </div>
       } @else {
-        <p class="empty">Choose {{ article() }} {{ label() }} image to compare.</p>
+        <p class="empty">Choose the {{ label() }} image to compare.</p>
       }
     </figure>
   `,
   styles: `
+    /* How this panel is sized as a flex item is the compare page's business, not its own. */
     :host {
       display: block;
-      /* Sizing as a flex item is the parent's business; see the compare page. */
-      min-width: 0;
     }
 
     .panel {
@@ -88,8 +87,6 @@ import { Box } from '../../core/diff/diff-types';
          everything else off the page. Capping the height shrinks the used width to match,
          and the frame follows it, so the overlay stays aligned. */
       max-height: 70vh;
-      width: auto;
-      height: auto;
     }
 
     /*
@@ -123,9 +120,4 @@ export class ImagePanelComponent {
 
   /** The settings changed since these boxes were produced. */
   readonly stale = input(false);
-
-  /** "an AFTER image" rather than "a AFTER image". */
-  protected article(): string {
-    return /^[AEIOU]/i.test(this.label()) ? 'an' : 'a';
-  }
 }
