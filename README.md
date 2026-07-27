@@ -18,9 +18,8 @@ Built with Node 22, all from `frontend/`. Also: `npm test` (236 specs) · `npm r
 `npm run samples` (redraws the samples and re-checks the claims about them) ·
 `npm run measure` (the table below).
 
-Two optional routes exist at the repository root and neither is needed to run, build or test
-the application: [a single jar](#running-it-as-a-single-jar) (Java 21 + Maven) and
-[Docker](#running-it-in-docker) (nothing else installed).
+Two optional ways to package it — a single jar, and Docker — are described in
+[DEPLOYMENT.md](DEPLOYMENT.md). Neither is needed to run, build or test the application.
 
 ---
 
@@ -163,54 +162,11 @@ it behind a Java service would be a transcription of those files plus one change
 appears in the worker chunk and in no other bundle. Production build: 571 kB raw,
 **125 kB transferred**.
 
----
-
-## Running it as a single jar
-
-Optional, and not part of the measured path. Requires Java 21 and Maven.
-
-```bash
-cd frontend && npm run build && cd ..
-mvn spring-boot:run          # http://localhost:8080
-```
-
-**This is static file hosting and nothing else.** One Java class,
-[`FastVisualDifferenceApplication`](src/main/java/com/fastvisualdifference/FastVisualDifferenceApplication.java),
-whose entire body is `SpringApplication.run(...)`. There is no controller, no configuration
-class, and no image data crosses into Java — the comparison still runs in the browser in the
-same Web Worker, so **the interval the timing markers bracket is identical whether the app
-is served by `ng serve` or by Spring Boot.**
-
-Maven copies `frontend/dist/fvd/browser` onto the classpath under `static/`; it does not
-invoke npm, so the two builds stay independent. The result is a 20 MB self-contained jar,
-which is convenient to hand over and is what the Docker image runs.
-
----
-
-## Running it in Docker
-
-Optional, and the only route that needs nothing installed but Docker itself.
-
-```bash
-docker compose up --build     # http://localhost:8080
-```
-
-Or without compose:
-
-```bash
-docker build -t fast-visual-difference .
-docker run --rm -p 8080:8080 fast-visual-difference
-```
-
-The `Dockerfile` has three stages — Node builds the Angular app, Maven packages the jar,
-and a **JRE** image runs it. Only the jar crosses into the final image, so `node_modules`
-and the compilers stay behind: **228 MB**, against the **649 MB** build stage it came out of
-(`docker build --target backend` reproduces that figure). It runs as a non-root user.
-
-**`docker-compose.yml` is shorthand for one `docker run`, not orchestration.** There is one
-service because there is one process and it serves static files — no database, no queue,
-nothing to schedule between. The application inside is byte-identical to the one
-`npm run dev` serves, and the comparison still runs in the reviewer's browser.
+The repository does contain a Spring Boot module and a `pom.xml`, which is worth explaining
+rather than leaving to be discovered. It is one class that serves static files, so that the
+whole application can be handed over as a single jar or a Docker image; no image data
+reaches Java, and the interval the timing markers bracket is identical either way. See
+[DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
