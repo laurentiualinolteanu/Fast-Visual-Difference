@@ -76,6 +76,32 @@ describe('ControlsBarComponent', () => {
     });
   });
 
+  describe('labelling', () => {
+    /**
+     * Every label must point at something that exists.
+     *
+     * `p-slider` accepts an `inputId` and silently discards it — it renders a
+     * `span[role=slider]`, not an input — so a `for` attribute aimed at it resolves to
+     * nothing and the control ends up with no accessible name. That went unnoticed
+     * precisely because the checkbox beside it, which does render a real input, worked.
+     */
+    it('leaves no label pointing at a missing element', () => {
+      const dangling = Array.from(host.querySelectorAll('label[for]'))
+        .map((label) => label.getAttribute('for')!)
+        .filter((id) => !host.querySelector(`#${id}`));
+
+      expect(dangling).toEqual([]);
+    });
+
+    it('gives the slider an accessible name', () => {
+      const handle = host.querySelector('[role="slider"]')!;
+      const labelledBy = handle.getAttribute('aria-labelledby');
+
+      expect(labelledBy).toBeTruthy();
+      expect(host.querySelector(`#${labelledBy}`)?.textContent).toContain('Sensitivity');
+    });
+  });
+
   describe('the anti-aliasing checkbox', () => {
     it('is labelled for what it does and starts on', () => {
       const label = host.querySelector('.checkbox-label')?.textContent ?? '';

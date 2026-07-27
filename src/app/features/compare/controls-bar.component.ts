@@ -76,12 +76,17 @@ export interface FileSelection {
       </div>
 
       <div class="sensitivity">
-        <label [attr.for]="'sensitivity'">
+        <!--
+          Labelled by id rather than by "for". p-slider accepts an inputId and discards
+          it: the control it renders is a span[role=slider], so a "for" attribute would
+          point at nothing and leave the slider with no accessible name at all.
+        -->
+        <label id="sensitivity-label">
           Sensitivity {{ settings().sensitivity }}/{{ maxSensitivity }}
         </label>
 
         <p-slider
-          inputId="sensitivity"
+          ariaLabelledBy="sensitivity-label"
           [min]="minSensitivity"
           [max]="maxSensitivity"
           [step]="1"
@@ -101,13 +106,16 @@ export interface FileSelection {
         </p>
       </div>
 
-      <p-checkbox
-        inputId="suppress-aa"
-        [binary]="true"
-        [ngModel]="settings().suppressAntiAliasing"
-        (ngModelChange)="onSuppressionChange($event)"
-      />
-      <label class="checkbox-label" for="suppress-aa">Ignore anti-aliasing &amp; 1px shifts</label>
+      <!-- Grouped so the pair wraps together; .controls is a wrapping flex row. -->
+      <div class="suppression">
+        <p-checkbox
+          inputId="suppress-aa"
+          [binary]="true"
+          [ngModel]="settings().suppressAntiAliasing"
+          (ngModelChange)="onSuppressionChange($event)"
+        />
+        <label class="checkbox-label" for="suppress-aa">Ignore anti-aliasing &amp; 1px shifts</label>
+      </div>
 
       <span
         class="compare"
@@ -167,10 +175,14 @@ export interface FileSelection {
       color: var(--p-text-muted-color, #64748b);
     }
 
+    .suppression {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
     .checkbox-label {
       font-size: 0.85rem;
-      /* The checkbox sits immediately before this, so pull the pair together. */
-      margin-left: -0.75rem;
     }
 
     /*
