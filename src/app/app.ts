@@ -1,15 +1,16 @@
 import { Component } from '@angular/core';
-import { ButtonModule } from 'primeng/button';
+
+import { ComparePageComponent } from './features/compare/compare-page.component';
 
 /**
- * Application shell.
+ * Application shell: the page title and the one feature the app has.
  *
- * For now this only proves the scaffold is wired (Angular + PrimeNG theme + styles).
- * T12 replaces the placeholder in `app.html` with `<app-compare-page />`.
+ * There is no router. A single view means a route table would be a table of one, and the
+ * indirection would have to be explained rather than read.
  */
 @Component({
   selector: 'app-root',
-  imports: [ButtonModule],
+  imports: [ComparePageComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
