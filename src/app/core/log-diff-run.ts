@@ -1,4 +1,4 @@
-import { DiffResult, DiffSettings } from './diff/diff-types';
+import { DiffResult, DiffSettings, DiffStats } from './diff/diff-types';
 
 /**
  * One structured console line per comparison.
@@ -21,15 +21,24 @@ export interface DiffRunContext {
   decodeMs: { before: number; after: number };
 }
 
+/**
+ * The share of tiles that survived screening and reached the expensive per-pixel pass.
+ *
+ * Lives here rather than in either caller because it is published twice — in this line
+ * and in the results summary on screen — and two independent expressions for one
+ * published number is how a console and a UI come to disagree about the same run.
+ */
+export function screenedInPercent(stats: DiffStats): string {
+  return ((stats.candidateTiles / stats.totalTiles) * 100).toFixed(1);
+}
+
 export function formatDiffRun(result: DiffResult, context: DiffRunContext): string {
   const { stats, timings } = result;
   const { settings, elapsedMs, decodeMs } = context;
 
-  const screenedIn = (stats.candidateTiles / stats.totalTiles) * 100;
-
   return (
     `[diff] ${stats.width}x${stats.height}` +
-    ` | tiles ${stats.candidateTiles}/${stats.totalTiles} (${screenedIn.toFixed(1)}% screened in)` +
+    ` | tiles ${stats.candidateTiles}/${stats.totalTiles} (${screenedInPercent(stats)}% screened in)` +
     ` | px ${stats.changedPixels} cells ${stats.changedCells} regions ${stats.rawRegions}` +
     ` -> ${result.boxes.length} boxes` +
     ` | screen ${ms(timings.screenMs)} score ${ms(timings.scoreMs)}` +

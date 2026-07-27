@@ -3,6 +3,7 @@ import { MessageModule } from 'primeng/message';
 
 import { LoadedImage } from '../../core/diff.service';
 import { DiffResult } from '../../core/diff/diff-types';
+import { screenedInPercent } from '../../core/log-diff-run';
 
 /**
  * What the last comparison cost, and what it cost to get ready for it.
@@ -61,7 +62,7 @@ import { DiffResult } from '../../core/diff/diff-types';
       </p>
 
       @for (warning of diff.warnings; track warning) {
-        <p-message severity="warn" [text]="warning" styleClass="warning" />
+        <p-message severity="warn" [text]="warning" />
       }
     }
   `,
@@ -107,13 +108,15 @@ export class ResultsSummaryComponent {
 
   readonly stale = input(false);
 
-  /** How much work the tile screen saved the expensive per-pixel pass. */
+  /**
+   * How little work the tile screen let through to the expensive per-pixel pass.
+   *
+   * Shared with the console line rather than recomputed: the same figure appearing in two
+   * places is exactly how a UI and a log come to disagree about one run.
+   */
   protected readonly screenedIn = computed(() => {
     const stats = this.result()?.stats;
-    if (!stats) {
-      return '0.0';
-    }
-    return ((stats.candidateTiles / stats.totalTiles) * 100).toFixed(1);
+    return stats ? screenedInPercent(stats) : '0.0';
   });
 
   /**

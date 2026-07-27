@@ -121,5 +121,43 @@ describe('compare page against a real worker', () => {
     expect(strokes[0].getAttribute('class')).toBe('change');
     expect(strokes[1].getAttribute('x')).toBe('298');
     expect(strokes[1].getAttribute('width')).toBe('5');
+
+    /*
+     * And the summary describes this run rather than an empty one.
+     *
+     * Same reasoning as the SVG above: the summary's own spec proves it renders correctly
+     * when handed data, and the page's spec proves the signals hold the right values, but
+     * nothing joined them. A binding reading `null` would delete the decode disclosure —
+     * the whole point of T16 — while every other spec stayed green.
+     */
+    const summary = (selector: string) =>
+      (host.querySelector(selector)?.textContent ?? '').replace(/\s+/g, ' ');
+
+    expect(summary('.loaded')).toContain('before 400×300');
+    expect(summary('.loaded')).toContain('after 400×300');
+    expect(summary('.loaded')).toContain('outside the measured comparison');
+
+    expect(summary('.compared')).toContain('2 differences');
+    expect(summary('.compared')).toContain('click to painted boxes');
+
+    expect(summary('.stages')).toContain('tiles screened in');
+
+    /*
+     * The headline must be the click-to-paint interval, not the engine total. Binding the
+     * smaller number is the one mistake that would quietly undo this task — the app would
+     * claim a time faster than the brief's own markers measure.
+     *
+     * Both figures are read back off the screen and compared as displayed. Comparing the
+     * rendered headline against the raw `timings.totalMs` would be comparing a rounded
+     * string to an unrounded number, and a value rounded *up* can exceed its own source —
+     * which made an earlier version of this assertion pass against the very bug it exists
+     * to catch.
+     */
+    const displayed = (text: string) => Number(/(\d+(?:\.\d+)?) ms/.exec(text)?.[1]);
+    const headlineMs = displayed(summary('.compared').replace(/^.*?in /, ''));
+    const engineMs = displayed(summary('.stages').replace(/^.*?Engine /, ''));
+
+    expect(engineMs).toBeGreaterThan(0);
+    expect(headlineMs).toBeGreaterThan(engineMs!);
   });
 });
