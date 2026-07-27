@@ -7,7 +7,8 @@
     "dev": "ng serve --open",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test --watch=false --browsers=ChromeHeadless"
+    "test": "ng test --watch=false --browsers=ChromeHeadless",
+    "samples": "esbuild samples/generate.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/fvd-samples.mjs --log-level=error && node node_modules/.cache/fvd-samples.mjs"
   },
   "prettier": {
     "overrides": [
