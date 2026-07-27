@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Optional static hosting for the built Angular app.
+
+  This module serves files. It does not process images, and no image data ever reaches
+  Java: the comparison runs in the browser, in a Web Worker, exactly as it does under
+  `npm run dev`. Adding a server here changes how the app is delivered and changes nothing
+  about what the assignment measures.
+
+  It exists because a single self-contained artefact is convenient to hand over, and
+  because Docker (T23) needs something to run. Everything it does could equally be done by
+  any static file server.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.5</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.fastvisualdifference</groupId>
+  <artifactId>fast-visual-difference</artifactId>
+  <version>1.0.0</version>
+  <name>Fast Visual Difference Detector</name>
+  <description>Static hosting for the browser-based difference detector</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <!-- Where `npm run build` leaves the application. -->
+    <frontend.dist>${project.basedir}/frontend/dist/fvd/browser</frontend.dist>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        Copy the built Angular app onto the classpath under `static/`, which Spring Boot
+        serves automatically. No `WebConfig` and no resource handler: the app is scaffolded
+        without routing and has no deep links, so there is nothing to forward and a
+        configuration class would be code that exists only to be read.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-frontend</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${frontend.dist}</directory>
+                  <filtering>false</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

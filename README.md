@@ -5,16 +5,22 @@ images. Everything runs in the browser; the comparison runs in a Web Worker so t
 stays responsive.
 
 ```bash
+cd frontend
 npm install
 npm run dev            # http://localhost:4200
 ```
 
-Load `samples/before.png` and `samples/after.png`, press **Compare**. See
-[`samples/README.md`](samples/README.md) for what changed in that pair and why.
+Load `frontend/samples/before.png` and `frontend/samples/after.png`, press **Compare**. See
+[`frontend/samples/README.md`](frontend/samples/README.md) for what changed in that pair and
+why.
 
-Built with Node 22. Also: `npm test` (236 specs) · `npm run build` · `npm run samples`
-(redraws the samples and re-checks the claims about them) · `npm run measure` (the table
-below).
+Built with Node 22, all from `frontend/`. Also: `npm test` (236 specs) · `npm run build` ·
+`npm run samples` (redraws the samples and re-checks the claims about them) ·
+`npm run measure` (the table below).
+
+There is also an optional Maven module at the repository root — see
+[Running it as a single jar](#running-it-as-a-single-jar). It is not needed to run, build or
+test the application.
 
 ---
 
@@ -62,7 +68,7 @@ recomputing.
 ## How processing time is measured
 
 `// PERFORMANCE_TIMER_START` and `// PERFORMANCE_TIMER_END` sit in one method,
-[`onCompare`](src/app/features/compare/compare-page.component.ts), with nothing between
+[`onCompare`](frontend/src/app/features/compare/compare-page.component.ts), with nothing between
 them but the call chain. The end marker follows a double `requestAnimationFrame`, so it
 fires once the frame containing the boxes has been composited — not a frame early.
 
@@ -150,12 +156,34 @@ images puts the network on that critical path and makes the measured number most
 time. Running in the browser removes it, and a Web Worker (27 lines, mostly comment) keeps the UI
 responsive.
 
-The engine is isolated in [`src/app/core/diff/`](src/app/core/diff/): pure functions over
+The engine is isolated in [`frontend/src/app/core/diff/`](frontend/src/app/core/diff/): pure functions over
 `{width, height, data}`, importing nothing from Angular, the DOM or the worker API. Moving
 it behind a Java service would be a transcription of those files plus one changed method in
 `diff.service.ts`; no component would change. The build confirms the separation — the engine
 appears in the worker chunk and in no other bundle. Production build: 571 kB raw,
 **125 kB transferred**.
+
+---
+
+## Running it as a single jar
+
+Optional, and not part of the measured path. Requires Java 21 and Maven.
+
+```bash
+cd frontend && npm run build && cd ..
+mvn spring-boot:run          # http://localhost:8080
+```
+
+**This is static file hosting and nothing else.** One Java class,
+[`FastVisualDifferenceApplication`](src/main/java/com/fastvisualdifference/FastVisualDifferenceApplication.java),
+whose entire body is `SpringApplication.run(...)`. There is no controller, no configuration
+class, and no image data crosses into Java — the comparison still runs in the browser in the
+same Web Worker, so **the interval the timing markers bracket is identical whether the app
+is served by `ng serve` or by Spring Boot.**
+
+Maven copies `frontend/dist/fvd/browser` onto the classpath under `static/`; it does not
+invoke npm, so the two builds stay independent. The result is a 20 MB self-contained jar,
+which is convenient to hand over and is what the Docker image runs.
 
 ---
 
