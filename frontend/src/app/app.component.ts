@@ -11,7 +11,7 @@ import { ComparePageComponent } from './features/compare/compare-page.component'
 @Component({
   selector: 'app-root',
   imports: [ComparePageComponent],
-  templateUrl: './app.html',
-  styleUrl: './app.css',
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.css',
 })
-export class App {}
+export class AppComponent {}

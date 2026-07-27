@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MessageService } from 'primeng/api';
 
-import { App } from './app';
+import { AppComponent } from './app.component';
 import { DiffService } from './core/diff.service';
 
 /**
@@ -17,7 +17,7 @@ import { DiffService } from './core/diff.service';
 describe('App shell', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [App],
+      imports: [AppComponent],
       providers: [
         provideNoopAnimations(),
         { provide: DiffService, useValue: {} },
@@ -28,7 +28,7 @@ describe('App shell', () => {
   });
 
   it('renders the title and mounts the compare page', () => {
-    const fixture = TestBed.createComponent(App);
+    const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toContain(
