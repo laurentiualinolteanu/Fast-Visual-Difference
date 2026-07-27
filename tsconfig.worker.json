@@ -13,7 +13,19 @@
     ],
     "types": []
   },
+  /* The engine is listed explicitly, not left to be pulled in through the worker's
+     imports. Until the worker actually imports it (T10) this config would otherwise
+     compile the placeholder alone and prove nothing — while still exiting 0, which
+     makes it worse than no check at all.
+
+     With "lib" holding no DOM entry and "types" empty, this is a compile-time proof
+     that core/diff touches neither the DOM nor Angular. Specs are excluded: they use
+     Jasmine globals, which are a test concern rather than an engine dependency. */
   "include": [
-    "src/**/*.worker.ts"
+    "src/**/*.worker.ts",
+    "src/app/core/diff/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts"
   ]
 }
