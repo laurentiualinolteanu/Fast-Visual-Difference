@@ -97,5 +97,29 @@ describe('compare page against a real worker', () => {
     // Decode was measured at load, outside that interval — the number T16 puts on screen.
     expect(page.before()!.decodeMs).toBeGreaterThan(0);
     expect(page.after()!.decodeMs).toBeGreaterThan(0);
+
+    /*
+     * And they reach the screen.
+     *
+     * Everything above this point would still pass if the overlay were bound to an empty
+     * array, or to the wrong signal: the engine's output is asserted, and the overlay's
+     * own spec proves it draws whatever it is handed, but nothing joined the two. This is
+     * the join — the engine's coordinates, read back off the rendered SVG.
+     */
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const strokes = Array.from(host.querySelectorAll<SVGRectElement>('g.strokes rect'));
+    const halos = host.querySelectorAll('g.halos rect');
+
+    // Two boxes, on both panels.
+    expect(strokes.length).toBe(boxes.length * 2);
+    expect(halos.length).toBe(strokes.length);
+
+    expect(strokes[0].getAttribute('x')).toBe('48');
+    expect(strokes[0].getAttribute('y')).toBe('38');
+    expect(strokes[0].getAttribute('class')).toBe('change');
+    expect(strokes[1].getAttribute('x')).toBe('298');
+    expect(strokes[1].getAttribute('width')).toBe('5');
   });
 });
