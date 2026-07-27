@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MessageService, ToastMessageOptions } from 'primeng/api';
 
 import { ComparePageComponent } from './compare-page.component';
 
@@ -41,9 +42,14 @@ async function pngFile(
 
 describe('compare page against a real worker', () => {
   it('turns two picked files into boxes on the changes', async () => {
+    // Nothing should reach the user: a toast here means some layer reported a failure.
+    const toasts: ToastMessageOptions[] = [];
+    const messages = new MessageService();
+    spyOn(messages, 'add').and.callFake((message: ToastMessageOptions) => toasts.push(message));
+
     TestBed.configureTestingModule({
       imports: [ComparePageComponent],
-      providers: [provideNoopAnimations()],
+      providers: [provideNoopAnimations(), { provide: MessageService, useValue: messages }],
     });
 
     const fixture = TestBed.createComponent(ComparePageComponent);
@@ -60,12 +66,14 @@ describe('compare page against a real worker', () => {
       }),
     );
 
-    expect(page.errorMessage()).withContext('a file failed to load').toBeNull();
+    expect(toasts.map((toast) => toast.detail)).withContext('a file failed to load').toEqual([]);
     expect(page.canCompare()).toBeTrue();
 
     await page.onCompare();
 
-    expect(page.errorMessage()).withContext('the comparison failed').toBeNull();
+    expect(toasts.map((toast) => toast.detail))
+      .withContext('the run reported a problem')
+      .toEqual([]);
 
     const boxes = page.boxes();
     expect(boxes.length).toBe(2);
@@ -118,7 +126,9 @@ describe('compare page against a real worker', () => {
 
     expect(strokes[0].getAttribute('x')).toBe('48');
     expect(strokes[0].getAttribute('y')).toBe('38');
-    expect(strokes[0].getAttribute('class')).toBe('change');
+    // `contains`, not equality: Angular's animation renderer stamps `ng-star-inserted`
+    // onto elements inserted by control flow once any animated component is in the tree.
+    expect(strokes[0].classList.contains('change')).toBeTrue();
     expect(strokes[1].getAttribute('x')).toBe('298');
     expect(strokes[1].getAttribute('width')).toBe('5');
 

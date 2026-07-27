@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { MessageService } from 'primeng/api';
+import { ToastModule } from 'primeng/toast';
 
 import { ControlsBarComponent } from './controls-bar.component';
 import { ImagePanelComponent } from './image-panel.component';
 import { ResultsSummaryComponent } from './results-summary.component';
-import { DiffService, ImageSlot, LoadedImage } from '../../core/diff.service';
+import { DiffService, ImageSlot, LoadedImage, largeImageWarning } from '../../core/diff.service';
 import { logDiffRun } from '../../core/log-diff-run';
 import { DiffResult, DiffSettings } from '../../core/diff/diff-types';
 import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
@@ -19,7 +21,7 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
  */
 @Component({
   selector: 'app-compare-page',
-  imports: [ControlsBarComponent, ImagePanelComponent, ResultsSummaryComponent],
+  imports: [ControlsBarComponent, ImagePanelComponent, ResultsSummaryComponent, ToastModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-controls-bar
@@ -32,9 +34,12 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       (compare)="onCompare()"
     />
 
-    @if (errorMessage(); as message) {
-      <p class="error" role="alert">{{ message }}</p>
-    }
+    <!--
+      Every failure the user can cause arrives here: an unreadable file, a comparison that
+      could not run, and anything the global ErrorHandler catches. There is no router and
+      this page is always mounted, so it is always somewhere for a message to land.
+    -->
+    <p-toast position="top-right" />
 
     <!--
       Written out twice rather than looped. The labels are the point: they must be fixed
@@ -87,6 +92,7 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
 })
 export class ComparePageComponent {
   private readonly diff = inject(DiffService);
+  private readonly messages = inject(MessageService);
 
   readonly before = signal<LoadedImage | null>(null);
   readonly after = signal<LoadedImage | null>(null);
@@ -121,8 +127,6 @@ export class ComparePageComponent {
   /** Click to painted boxes, in milliseconds. See `onCompare`. */
   readonly elapsedMs = signal(0);
 
-  /** Replaced by a toast in T17. */
-  readonly errorMessage = signal<string | null>(null);
 
   /**
    * Why a comparison cannot run right now, or `null` if it can.
@@ -165,7 +169,6 @@ export class ComparePageComponent {
       return;
     }
 
-    this.errorMessage.set(null);
     const startedAt = performance.now();
 
     // PERFORMANCE_TIMER_START
@@ -188,7 +191,15 @@ export class ComparePageComponent {
         },
       });
     } catch (failure) {
-      this.errorMessage.set(messageOf(failure));
+      // Caught, never rethrown: this method is called from a template binding whose
+      // returned promise nobody awaits, so a rejection here would surface only as an
+      // unhandled rejection in the console.
+      this.messages.add({
+        severity: 'error',
+        summary: 'Comparison failed',
+        detail: messageOf(failure),
+        life: 10000,
+      });
     } finally {
       this.busy.set(false);
     }
@@ -196,7 +207,6 @@ export class ComparePageComponent {
 
   /** Decode a picked file and hand its pixels to the worker. Runs before the click. */
   async onFile(slot: ImageSlot, file: File): Promise<void> {
-    this.errorMessage.set(null);
     this.loading.set(true);
 
     try {
@@ -206,10 +216,26 @@ export class ComparePageComponent {
       // The previous result described images that are no longer loaded.
       this.result.set(null);
       this.stale.set(false);
+
+      const tooLarge = largeImageWarning(loaded);
+      if (tooLarge) {
+        // A warning, not a refusal — the comparison still runs.
+        this.messages.add({
+          severity: 'warn',
+          summary: 'Very large image',
+          detail: tooLarge,
+          life: 10000,
+        });
+      }
     } catch (failure) {
       // The service guarantees a failed load leaves both slots as they were, so there is
-      // nothing to roll back here.
-      this.errorMessage.set(messageOf(failure));
+      // nothing to roll back here — including the slot that failed.
+      this.messages.add({
+        severity: 'error',
+        summary: 'Could not load image',
+        detail: messageOf(failure),
+        life: 10000,
+      });
     } finally {
       this.loading.set(false);
     }

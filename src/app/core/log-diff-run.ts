@@ -1,3 +1,5 @@
+import { isDevMode } from '@angular/core';
+
 import { DiffResult, DiffSettings, DiffStats } from './diff/diff-types';
 
 /**
@@ -52,7 +54,18 @@ export function formatDiffRun(result: DiffResult, context: DiffRunContext): stri
   );
 }
 
+/**
+ * Write the line, in development only.
+ *
+ * `isDevMode()` rather than an `environment.production` flag: Angular 17 and later do not
+ * scaffold `src/environments/` at all, so that constant would need a file and a build
+ * configuration invented to hold it (Reviewer Report D6). `formatDiffRun` stays ungated
+ * and exported, so the line remains reachable and fully tested either way.
+ */
 export function logDiffRun(result: DiffResult, context: DiffRunContext): void {
+  if (!isDevMode()) {
+    return;
+  }
   console.info(formatDiffRun(result, context));
 }
 

@@ -1,5 +1,6 @@
 import {
   ApplicationConfig,
+  ErrorHandler,
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
 } from '@angular/core';
@@ -7,6 +8,8 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { MessageService } from 'primeng/api';
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeng/themes/aura';
+
+import { GlobalErrorHandler } from './core/global-error-handler';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,7 +27,15 @@ export const appConfig: ApplicationConfig = {
         },
       },
     }),
-    // Used by the toast/error paths introduced in T17; registered once at the root.
+    // The one channel for anything the user needs to be told. Registered at the root so
+    // the global error handler and the compare page reach the same toast.
     MessageService,
+
+    /*
+     * The catch-all. `provideBrowserGlobalErrorListeners` above routes uncaught errors
+     * and unhandled promise rejections here too, so a failure nobody anticipated becomes
+     * a toast rather than a page that quietly stops responding.
+     */
+    { provide: ErrorHandler, useClass: GlobalErrorHandler },
   ],
 };

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MessageService, ToastMessageOptions } from 'primeng/api';
 
 import { ComparePageComponent } from './compare-page.component';
 import { DiffService, ImageSlot, LoadedImage } from '../../core/diff.service';
@@ -72,6 +73,11 @@ class FakeDiffService {
     this.settleLoad?.(loadedImage(name));
   }
 
+  /** For cases that need particular dimensions, such as the very-large-image warning. */
+  resolveLoadWith(loaded: LoadedImage): void {
+    this.settleLoad?.(loaded);
+  }
+
   rejectLoad(message: string): void {
     this.failLoad?.(new Error(message));
   }
@@ -91,6 +97,12 @@ describe('ComparePageComponent', () => {
   let service: FakeDiffService;
   let logged: jasmine.Spy;
 
+  /** Everything the page told the user, in order. */
+  let toasts: ToastMessageOptions[];
+
+  const detailOf = (severity: string) =>
+    toasts.filter((toast) => toast.severity === severity).map((toast) => toast.detail).join(' ');
+
   beforeEach(() => {
     // Every completed run emits one structured line (see `core/log-diff-run.ts`). These
     // specs have no interest in it, and left alone it buries the suite output.
@@ -98,9 +110,19 @@ describe('ComparePageComponent', () => {
 
     service = new FakeDiffService();
 
+    // The real service, with `add` intercepted: `p-toast` subscribes to its observables
+    // on render, so a bare object stub breaks the component before any spec runs.
+    toasts = [];
+    const messages = new MessageService();
+    spyOn(messages, 'add').and.callFake((message: ToastMessageOptions) => toasts.push(message));
+
     TestBed.configureTestingModule({
       imports: [ComparePageComponent],
-      providers: [provideNoopAnimations(), { provide: DiffService, useValue: service }],
+      providers: [
+        provideNoopAnimations(),
+        { provide: DiffService, useValue: service },
+        { provide: MessageService, useValue: messages },
+      ],
     });
 
     fixture = TestBed.createComponent(ComparePageComponent);
@@ -231,7 +253,7 @@ describe('ComparePageComponent', () => {
       await failing;
 
       expect(page.loading()).toBeFalse();
-      expect(page.errorMessage()).toContain('could not be decoded');
+      expect(detailOf('error')).toContain('could not be decoded');
       // The service guarantees the other slot survives; the page must not clear it either.
       expect(page.before()?.name).toBe('good.png');
       expect(page.after()).toBeNull();
@@ -331,25 +353,63 @@ describe('ComparePageComponent', () => {
       service.rejectCompare('Both images must be loaded before comparing.');
       await comparing;
 
-      expect(page.errorMessage()).toContain('Both images must be loaded');
+      expect(detailOf('error')).toContain('Both images must be loaded');
       expect(page.busy()).toBeFalse();
       expect(page.canCompare()).toBeTrue();
     });
+  });
 
-    it('clears a previous error when a new run starts', async () => {
+  describe('what the user is told', () => {
+    it('warns about a very large image but still loads it', async () => {
+      // A refusal would fail the one case a visual diff is least replaceable by looking
+      // at the two pictures side by side.
+      const loading = page.onFile('before', new File([], 'huge.png', { type: 'image/png' }));
+      service.resolveLoadWith({ ...loadedImage('huge.png'), width: 12000, height: 9000 });
+      await loading;
+
+      expect(page.before()?.name).toBe('huge.png');
+      expect(toasts.length).toBe(1);
+      expect(toasts[0].severity).toBe('warn');
+      expect(toasts[0].detail).toContain('108 MP');
+      expect(toasts[0].detail).toContain('MB of memory');
+    });
+
+    it('says nothing about an ordinary image', async () => {
+      await load('before');
+
+      expect(toasts).toEqual([]);
+    });
+
+    it('titles a load failure and a comparison failure differently', async () => {
+      const failing = page.onFile('before', new File([], 'bad.png', { type: 'image/png' }));
+      service.rejectLoad('"bad.png" could not be decoded.');
+      await failing;
+
       await load('before');
       await load('after');
-
-      const failing = page.onCompare();
-      service.rejectCompare('boom');
-      await failing;
-      expect(page.errorMessage()).toBe('boom');
-
       const comparing = page.onCompare();
-      service.resolveCompare();
+      service.rejectCompare('the engine fell over');
       await comparing;
 
-      expect(page.errorMessage()).toBeNull();
+      expect(toasts.map((toast) => toast.summary)).toEqual([
+        'Could not load image',
+        'Comparison failed',
+      ]);
+    });
+
+    it('never rejects the promise a template binding does not await', async () => {
+      // `(fileSelected)="onFile(...)"` and `(compare)="onCompare()"` discard the returned
+      // promise. If either could reject, the failure would appear only as an unhandled
+      // rejection in the console — which is one of this task's acceptance criteria.
+      const failingLoad = page.onFile('before', new File([], 'bad.png', { type: 'image/png' }));
+      service.rejectLoad('nope');
+      await expectAsync(failingLoad).toBeResolved();
+
+      await load('before');
+      await load('after');
+      const failingCompare = page.onCompare();
+      service.rejectCompare('nope');
+      await expectAsync(failingCompare).toBeResolved();
     });
   });
 });

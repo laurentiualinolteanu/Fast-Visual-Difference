@@ -47,6 +47,39 @@ export interface LoadedImage {
   decodeMs: number;
 }
 
+/**
+ * Above this, a pair of images is worth warning about before the user waits for it.
+ *
+ * 80 MP is roughly a 10000x8000 image. The worker holds four bytes per pixel per slot, so
+ * a pair at this size is about 640 MB of `ImageData` that stays resident until the slot is
+ * replaced — enough that a tab can fail to allocate, and enough that the user deserves to
+ * know why their machine has slowed down rather than discovering it.
+ */
+export const LARGE_IMAGE_PIXELS = 80_000_000;
+
+/**
+ * A sentence to show the user if this image is large enough to matter, otherwise `null`.
+ *
+ * A warning, never a rejection: the comparison still runs. Refusing a large image would
+ * fail the one case where a visual diff tool is most useful and least replaceable by
+ * looking at the two pictures side by side.
+ */
+export function largeImageWarning(image: LoadedImage): string | null {
+  const pixels = image.width * image.height;
+
+  if (pixels <= LARGE_IMAGE_PIXELS) {
+    return null;
+  }
+
+  // Both slots, four bytes per pixel, held by the worker until replaced.
+  const pairMb = Math.round((pixels * 4 * 2) / 1_048_576);
+
+  return (
+    `${image.name} is ${image.width}×${image.height} (${Math.round(pixels / 1_000_000)} MP). ` +
+    `The comparison will still run, but a pair this size needs roughly ${pairMb} MB of memory.`
+  );
+}
+
 /** How the service obtains its worker. Replaced in tests; never replaced in the app. */
 export type DiffWorkerFactory = () => Worker;
 

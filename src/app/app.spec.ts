@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MessageService } from 'primeng/api';
 
 import { App } from './app';
 import { DiffService } from './core/diff.service';
@@ -17,7 +18,12 @@ describe('App shell', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideNoopAnimations(), { provide: DiffService, useValue: {} }],
+      providers: [
+        provideNoopAnimations(),
+        { provide: DiffService, useValue: {} },
+        // Real, because `p-toast` inside the compare page subscribes to its observables.
+        MessageService,
+      ],
     }).compileComponents();
   });
 
