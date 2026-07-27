@@ -197,10 +197,13 @@ export class ComparePageComponent {
   readonly result = signal<DiffResult | null>(null);
 
   /**
-   * Kept separately from `result().boxes` because T13's overlay binds to it, and because
-   * a stale result must keep its numbers on screen while its boxes are cleared or dimmed.
+   * What the overlay draws: always the current result's boxes.
+   *
+   * Derived rather than stored. Two writable copies of one fact can only ever disagree,
+   * and there is no case where they should — a stale result keeps its boxes on screen and
+   * T14 dims them, rather than clearing them.
    */
-  readonly boxes = signal<DiffResult['boxes']>([]);
+  readonly boxes = computed<DiffResult['boxes']>(() => this.result()?.boxes ?? []);
 
   /** A comparison is running. */
   readonly busy = signal(false);
@@ -258,7 +261,6 @@ export class ComparePageComponent {
     try {
       const result = await this.diff.compare(this.settings());
       this.result.set(result);
-      this.boxes.set(result.boxes);
       this.stale.set(false);
       await this.nextPaint();
       // PERFORMANCE_TIMER_END
@@ -285,7 +287,6 @@ export class ComparePageComponent {
 
       // The previous result described images that are no longer loaded.
       this.result.set(null);
-      this.boxes.set([]);
       this.stale.set(false);
     } catch (failure) {
       // The service guarantees a failed load leaves both slots as they were, so there is

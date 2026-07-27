@@ -91,6 +91,10 @@ describe('ComparePageComponent', () => {
   let service: FakeDiffService;
 
   beforeEach(() => {
+    // The page logs each result until T16 replaces that with a structured line. These
+    // specs have no interest in it, and left alone it buries the suite output.
+    spyOn(console, 'log');
+
     service = new FakeDiffService();
 
     TestBed.configureTestingModule({
