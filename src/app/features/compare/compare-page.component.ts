@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ButtonModule } from 'primeng/button';
 
+import { ControlsBarComponent } from './controls-bar.component';
 import { ImagePanelComponent } from './image-panel.component';
 import { DiffService, ImageSlot, LoadedImage } from '../../core/diff.service';
 import { DiffResult, DiffSettings } from '../../core/diff/diff-types';
@@ -10,65 +10,25 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
  * Orchestration for the whole page: what is loaded, what the settings are, and what the
  * last comparison produced. Everything else is presentation.
  *
- * The layout here is deliberately plain HTML. T13–T16 replace it with the overlay, the
- * image panels, the controls bar and the results summary; the state and the methods below
- * are already the contract those components will bind to, so they drop in without
- * changing this logic.
+ * The child components hold no state of their own: they render what they are given and
+ * emit what the user asked for. Everything about "what the app currently is" lives here.
+ *
+ * The results section is still temporary plain HTML — T16 replaces it.
  */
 @Component({
   selector: 'app-compare-page',
-  imports: [ImagePanelComponent, ButtonModule],
+  imports: [ControlsBarComponent, ImagePanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="controls">
-      <label class="control">
-        <span>Before</span>
-        <input
-          type="file"
-          accept="image/*"
-          [disabled]="loading()"
-          (change)="onFileInput('before', $event)"
-        />
-      </label>
-
-      <label class="control">
-        <span>After</span>
-        <input
-          type="file"
-          accept="image/*"
-          [disabled]="loading()"
-          (change)="onFileInput('after', $event)"
-        />
-      </label>
-
-      <label class="control">
-        <span>Sensitivity {{ settings().sensitivity }}</span>
-        <input
-          type="range"
-          min="1"
-          max="10"
-          step="1"
-          [value]="settings().sensitivity"
-          (input)="onSensitivityInput($event)"
-        />
-      </label>
-
-      <label class="control control--inline">
-        <input
-          type="checkbox"
-          [checked]="settings().suppressAntiAliasing"
-          (change)="onSuppressionInput($event)"
-        />
-        <span>Ignore anti-aliasing &amp; 1px shifts</span>
-      </label>
-
-      <p-button
-        label="Compare"
-        [disabled]="!canCompare()"
-        [loading]="busy()"
-        (onClick)="onCompare()"
-      />
-    </section>
+    <app-controls-bar
+      [settings]="settings()"
+      [busy]="busy()"
+      [loading]="loading()"
+      [blockedReason]="compareBlockedReason()"
+      (fileSelected)="onFile($event.slot, $event.file)"
+      (settingsChange)="onSettingsChange($event)"
+      (compare)="onCompare()"
+    />
 
     @if (errorMessage(); as message) {
       <p class="error" role="alert">{{ message }}</p>
@@ -113,26 +73,6 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
   styles: `
     :host {
       display: block;
-    }
-
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .control {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      font-size: 0.85rem;
-    }
-
-    .control--inline {
-      flex-direction: row;
-      align-items: center;
     }
 
     .panels {
@@ -204,9 +144,29 @@ export class ComparePageComponent {
   /** Replaced by a toast in T17. */
   readonly errorMessage = signal<string | null>(null);
 
-  readonly canCompare = computed(
-    () => !!this.before() && !!this.after() && !this.busy() && !this.loading(),
-  );
+  /**
+   * Why a comparison cannot run right now, or `null` if it can.
+   *
+   * Phrased for a user rather than for a log, because it is what the Compare button's
+   * tooltip says while the button is greyed out. `canCompare` is derived from it rather
+   * than computed alongside it: two independent expressions for "may we run" would
+   * eventually disagree, and the disagreement would show as a button that is enabled
+   * while claiming to be blocked.
+   */
+  readonly compareBlockedReason = computed<string | null>(() => {
+    if (this.loading()) {
+      return 'Waiting for an image to finish loading.';
+    }
+    if (!this.before() || !this.after()) {
+      return 'Load a before and an after image first.';
+    }
+    if (this.busy()) {
+      return 'A comparison is already running.';
+    }
+    return null;
+  });
+
+  readonly canCompare = computed(() => this.compareBlockedReason() === null);
 
   /**
    * Run a comparison and stop the clock once the boxes are actually on screen.
@@ -295,30 +255,6 @@ export class ComparePageComponent {
     return new Promise((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
-  }
-
-  /* --- Temporary template adapters. T15's controls bar calls the methods above. --- */
-
-  onFileInput(slot: ImageSlot, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-
-    // Clearing the input means picking the same file twice in a row still fires `change`.
-    input.value = '';
-
-    if (file) {
-      void this.onFile(slot, file);
-    }
-  }
-
-  onSensitivityInput(event: Event): void {
-    const sensitivity = Number((event.target as HTMLInputElement).value);
-    this.onSettingsChange({ ...this.settings(), sensitivity });
-  }
-
-  onSuppressionInput(event: Event): void {
-    const suppressAntiAliasing = (event.target as HTMLInputElement).checked;
-    this.onSettingsChange({ ...this.settings(), suppressAntiAliasing });
   }
 
   protected round(value: number): number {

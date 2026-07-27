@@ -134,6 +134,36 @@ describe('ComparePageComponent', () => {
       expect(page.canCompare()).toBeTrue();
     });
 
+    it('says why it is blocked, in words meant for the user', async () => {
+      // The tooltip on a greyed-out button is the only place this can be explained, so
+      // the reason has to be a sentence rather than a boolean.
+      expect(page.compareBlockedReason()).toBe('Load a before and an after image first.');
+
+      const loading = page.onFile('before', new File([], 'a.png', { type: 'image/png' }));
+      expect(page.compareBlockedReason()).toBe('Waiting for an image to finish loading.');
+      service.resolveLoad('a.png');
+      await loading;
+
+      await load('after');
+      expect(page.compareBlockedReason()).toBeNull();
+
+      const comparing = page.onCompare();
+      expect(page.compareBlockedReason()).toBe('A comparison is already running.');
+      service.resolveCompare();
+      await comparing;
+    });
+
+    it('cannot disagree with its own reason', async () => {
+      // `canCompare` is derived from the reason rather than computed alongside it: two
+      // expressions for "may we run" would eventually drift, and the drift would show as
+      // a button that is enabled while claiming to be blocked.
+      await load('before');
+      expect(page.canCompare()).toBe(page.compareBlockedReason() === null);
+
+      await load('after');
+      expect(page.canCompare()).toBe(page.compareBlockedReason() === null);
+    });
+
     it('is unavailable while a comparison is in flight', async () => {
       await load('before');
       await load('after');
@@ -238,11 +268,10 @@ describe('ComparePageComponent', () => {
       expect(page.stale()).toBeFalse();
     });
 
-    it('is what the temporary slider and checkbox go through', () => {
-      page.onSensitivityInput({ target: { value: '2' } } as unknown as Event);
-      expect(page.settings().sensitivity).toBe(2);
+    it('replaces the settings wholesale, whichever control emitted them', () => {
+      // The controls bar always emits a complete `DiffSettings`; the page stores it.
+      page.onSettingsChange({ sensitivity: 2, suppressAntiAliasing: false });
 
-      page.onSuppressionInput({ target: { checked: false } } as unknown as Event);
       expect(page.settings()).toEqual({ sensitivity: 2, suppressAntiAliasing: false });
     });
   });
