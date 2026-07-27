@@ -22,12 +22,13 @@ import {
   BRIDGE_CELLS,
   CELL,
   DEFAULT_SETTINGS,
+  LUMA_DELTA_WEIGHT,
   MERGE_GAP_PX,
   TILE,
   deriveParams,
 } from '../src/app/core/diff/sensitivity';
 import type { Canvas } from './scene';
-import { AFTER, BEFORE, drawScene, fillRect } from './scene';
+import { AFTER, BEFORE, BUTTON_AFTER, BUTTON_BEFORE, drawScene, fillRect } from './scene';
 
 const WARMUP_RUNS = 2;
 const TIMED_RUNS = 7;
@@ -166,11 +167,39 @@ console.log('           ', `${process.platform} ${process.arch}, node ${process.
 console.log(
   'settings  ',
   `sensitivity ${DEFAULT_SETTINGS.sensitivity}/10 ` +
-    `(threshold ~${derived.equivalentLumaStep}/255, min cluster ${derived.minChangedPixels} px), ` +
+    `(threshold ${derived.colorThreshold.toFixed(1)}, shown as ~${derived.equivalentLumaStep}/255, ` +
+    `min cluster ${derived.minChangedPixels} px), ` +
     `AA suppression ${DEFAULT_SETTINGS.suppressAntiAliasing ? 'on' : 'off'}`,
 );
 console.log('constants  ', `TILE ${TILE}, CELL ${CELL}, BRIDGE_CELLS ${BRIDGE_CELLS}, MERGE_GAP_PX ${MERGE_GAP_PX}`);
-console.log('runs       ', `median of ${TIMED_RUNS} after ${WARMUP_RUNS} warm-up runs\n`);
+console.log('runs       ', `median of ${TIMED_RUNS} after ${WARMUP_RUNS} warm-up runs`);
+
+/*
+ * The colour-metric comparison the README leans on hardest, printed rather than asserted.
+ *
+ * The sample pair's button changes hue while keeping almost the same brightness. Scoring
+ * it two ways — the full weighted-YIQ distance the engine uses, and the luma term alone,
+ * which is all a greyscale diff has — is the evidence for choosing a perceptual metric.
+ * These three numbers appear in README.md and samples/README.md; until now nothing
+ * produced them.
+ */
+const [before1, after1] = [BUTTON_BEFORE, BUTTON_AFTER];
+const dr = before1[0] - after1[0];
+const dg = before1[1] - after1[1];
+const db = before1[2] - after1[2];
+const dy = 0.29889531 * dr + 0.58662247 * dg + 0.11448223 * db;
+const di = 0.59597799 * dr - 0.2741761 * dg - 0.32180189 * db;
+const dq = 0.21147017 * dr - 0.52261711 * dg + 0.31114694 * db;
+const luma = (rgb: readonly number[]) => 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+
+console.log(
+  'colour     ',
+  `button rgb(${before1}) -> rgb(${after1}): ` +
+    `brightness ${luma(before1).toFixed(1)} vs ${luma(after1).toFixed(1)} · ` +
+    `weighted-YIQ ${(LUMA_DELTA_WEIGHT * dy * dy + 0.299 * di * di + 0.1957 * dq * dq).toFixed(1)} · ` +
+    `luma term alone ${(LUMA_DELTA_WEIGHT * dy * dy).toFixed(3)} · ` +
+    `threshold ${derived.colorThreshold.toFixed(1)}\n`,
+);
 
 /** `--csv` prints one comma-separated row per case, for sweeping a constant. */
 const asCsv = process.argv.includes('--csv');

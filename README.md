@@ -38,7 +38,8 @@ as possible.
 **Why YIQ rather than brightness.** The sample pair's button goes from `rgb(37,99,235)` to
 `rgb(13,145,66)` — two colours of almost identical brightness, 96.0 against 96.5 out of 255.
 A brightness-only comparison scores it at **0.109** against a threshold of 163.4 — nothing
-at all. Weighted YIQ scores it at **1532**, ten times the threshold.
+at all. Weighted YIQ scores it at **1532**, ten times the threshold. (`npm run measure`
+prints all four figures.)
 
 ---
 
@@ -70,9 +71,9 @@ that number.** Decoding a PNG is the most expensive operation here. Doing it at 
 time is better for the user, who chose the files seconds earlier while the app sat idle, and
 it removes the dominant cost from the measured window. So the results panel reports both:
 
-> **Loaded:** before 1280×840 (6.1 ms) · after 1280×840 (5.6 ms) &nbsp;decode, at load —
-> outside the measured comparison
-> **Compared:** 2 differences in 24 ms &nbsp;click to painted boxes
+> **Loaded:** before 1280×840 (6.1 ms) · after 1280×840 (5.6 ms) &nbsp; decode, at load —
+> outside the measured comparison<br>
+> **Compared:** 2 differences in 24 ms &nbsp; click to painted boxes
 
 The headline is click-to-painted-boxes — the *larger* figure; the engine total sits beneath
 it. The app's clock starts one statement before `PERFORMANCE_TIMER_START` and is read one

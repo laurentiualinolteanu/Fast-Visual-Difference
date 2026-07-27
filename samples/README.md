@@ -24,7 +24,8 @@ have almost the same relative luma — `rgb(37, 99, 235)` measures 96.0 and
 comes down to brightness, which a greyscale diff is, would score this at **0.109** against
 a detection threshold of 163.4 and report nothing at all. The full weighted-YIQ metric
 scores it at **1532**, nearly ten times the threshold. This one difference is the evidence
-for choosing a perceptual colour distance over a luminance one.
+for choosing a perceptual colour distance over a luminance one. `npm run measure` prints
+these four figures, so they can be checked rather than taken on trust.
 
 **The notification dot is three pixels across.** Detecting it is the design's headline
 claim; the minimum cluster size at the default sensitivity is one pixel, which is why it
