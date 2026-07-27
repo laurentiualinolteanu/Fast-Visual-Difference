@@ -28,12 +28,17 @@ describe('mergeAndFinalise', () => {
     });
 
     it('merges boxes that are close and keeps distant ones apart', () => {
-      const close = finalise([region(100, 100, 10, 10), region(116, 100, 10, 10)]); // 6px apart
-      const distant = finalise([region(100, 100, 10, 10), region(150, 100, 10, 10)]); // 40px apart
+      // Separations either side of the gap, derived from the constant rather than fixed:
+      // T20 raised it from 8 to 16 after measuring 2x screen captures, and a spec that
+      // pins the number rather than the behaviour just has to be edited when it moves.
+      const near = 100 + 10 + MERGE_GAP_PX - 2;
+      const far = 100 + 10 + MERGE_GAP_PX * 3;
 
-      expect(MERGE_GAP_PX).toBe(8);
-      expect(close.boxes.length).toBe(1);
-      expect(distant.boxes.length).toBe(2);
+      const close = finalise([region(100, 100, 10, 10), region(near, 100, 10, 10)]);
+      const distant = finalise([region(100, 100, 10, 10), region(far, 100, 10, 10)]);
+
+      expect(close.boxes.length).withContext(`${MERGE_GAP_PX - 2}px apart`).toBe(1);
+      expect(distant.boxes.length).withContext(`${MERGE_GAP_PX * 3}px apart`).toBe(2);
     });
 
     it('merges vertically as readily as horizontally', () => {

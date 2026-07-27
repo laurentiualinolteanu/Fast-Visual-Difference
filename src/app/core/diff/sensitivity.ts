@@ -80,13 +80,30 @@ export const DENSITY_GUARD_RATIO = 0.25;
 
 /**
  * Stage 3 gap bridged during grouping, in cells. 2 cells = 8px.
- * Assumption: body text is 12-16px and inter-glyph gaps are under 8px, so a changed word
- * becomes one box rather than one box per stroke.
+ *
+ * Deliberately the conservative of the two gap constants: grouping runs on the coarse
+ * cell grid and joining too eagerly here cannot be undone later. Measured (T20): between
+ * 1 and 4 cells this changes no box count on any test pair, because Stage 4 closes the
+ * remaining gaps anyway. At 6 it starts merging changes that should stay separate. Two is
+ * inside the flat part of that range.
  */
 export const BRIDGE_CELLS = 2;
 
-/** Stage 4 box merging distance, in pixels. The same 8px assumption as BRIDGE_CELLS. */
-export const MERGE_GAP_PX = 8;
+/**
+ * Stage 4 box merging distance, in pixels.
+ *
+ * **16, not 8 — this was measured rather than reasoned.** The original 8 assumed body text
+ * at 12-16px with inter-glyph gaps under 8px, which holds for a 1x screenshot and fails
+ * for every other capture. On a 2x display — most modern laptops — the same interface is
+ * captured with everything twice as far apart, and a single changed digit was reported as
+ * four separate marks: 7 boxes for 4 edits. At 16 both the 2x and 3x cases collapse back
+ * to 4.
+ *
+ * The cost is real and bounded: two distinct changes 12px apart now merge into one box,
+ * while changes 24px apart still stay separate. Raising it further to 24 loses that, which
+ * is why it stops here.
+ */
+export const MERGE_GAP_PX = 16;
 
 /**
  * How many times Stage 4 re-runs the merge at a given gap. Each pass can only join boxes
@@ -97,8 +114,8 @@ export const MERGE_PASSES = 3;
 
 /**
  * Factor by which the merge gap grows when there are still too many boxes, and the point
- * at which growing it further is admitting defeat. Tripling reaches the ceiling in four
- * steps (8, 24, 72, 216), so the escalation cannot spin.
+ * at which growing it further is admitting defeat. Tripling reaches the ceiling in three
+ * steps from the base gap (16, 48, 144), so the escalation cannot spin.
  */
 export const MERGE_GAP_ESCALATION = 3;
 export const MAX_MERGE_GAP_PX = 128;

@@ -170,4 +170,66 @@ describe('compare page against a real worker', () => {
     expect(engineMs).toBeGreaterThan(0);
     expect(headlineMs).toBeGreaterThan(engineMs!);
   });
+
+  /**
+   * The click-to-paint measurement, at the size of the committed sample pair.
+   *
+   * `npm run measure` times the engine in Node, which is the right instrument for tuning
+   * but is not the interval the brief asks about: that one starts at the click and ends
+   * when the boxes are on screen, and it can only be measured in a browser driving a real
+   * worker. This is where that number comes from — the one quoted in the README.
+   *
+   * It logs rather than asserting a threshold. A timing assertion on shared CI hardware
+   * is a flaky test wearing a useful disguise; the assertions here are about correctness,
+   * and the number is printed for a human to read.
+   */
+  it('reports click-to-paint for a 1280x840 pair', async () => {
+    const messages = new MessageService();
+    TestBed.configureTestingModule({
+      imports: [ComparePageComponent],
+      providers: [provideNoopAnimations(), { provide: MessageService, useValue: messages }],
+    });
+
+    const fixture = TestBed.createComponent(ComparePageComponent);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const scene = (variant: 'before' | 'after') =>
+      pngFile(`${variant}.png`, 1280, 840, (context) => {
+        // A dense-ish page: panels, a chart and text-sized marks, so the tile screen has
+        // something to reject rather than a flat expanse it trivially skips.
+        context.fillStyle = '#1e293b';
+        context.fillRect(0, 0, 1280, 72);
+        context.fillStyle = '#7dd3fc';
+        for (let bar = 0; bar < 12; bar++) {
+          context.fillRect(316 + bar * 78, 360 + (bar % 5) * 12, 48, 200 - (bar % 5) * 12);
+        }
+        context.fillStyle = '#334155';
+        for (let line = 0; line < 40; line++) {
+          context.fillRect(300 + (line % 4) * 240, 620 + Math.floor(line / 4) * 18, 180, 8);
+        }
+
+        if (variant === 'after') {
+          context.fillStyle = '#0d9142';
+          context.fillRect(288, 640, 200, 56); // a recolour
+          context.fillStyle = '#f43f5e';
+          context.fillRect(1180, 38, 3, 3); // the 3px case
+        }
+      });
+
+    await page.onFile('before', await scene('before'));
+    await page.onFile('after', await scene('after'));
+    await page.onCompare();
+
+    const result = page.result()!;
+    expect(result.boxes.length).toBeGreaterThan(0);
+
+    console.warn(
+      `MEASURED 1280x840 in-browser: engine ${result.timings.totalMs.toFixed(1)} ms · ` +
+        `click-to-paint ${page.elapsedMs().toFixed(1)} ms · ` +
+        `decode ${page.before()!.decodeMs.toFixed(1)}/${page.after()!.decodeMs.toFixed(1)} ms · ` +
+        `${result.stats.candidateTiles}/${result.stats.totalTiles} tiles screened in · ` +
+        `${result.boxes.length} boxes`,
+    );
+  });
 });
