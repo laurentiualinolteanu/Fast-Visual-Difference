@@ -3,8 +3,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/worker",
+    /* ES2022 to match tsconfig.json's target. The CLI scaffolds "es2018" here, which
+       silently gives the worker a smaller standard library than the app: code using
+       Array.prototype.at/flat compiles under tsconfig.app.json and fails here. The
+       whole diff engine is imported by the worker, so the two must agree. */
     "lib": [
-      "es2018",
+      "ES2022",
       "webworker"
     ],
     "types": []

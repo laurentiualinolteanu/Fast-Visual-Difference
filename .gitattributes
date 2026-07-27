@@ -1,0 +1,13 @@
+# Normalise line endings so the repository always stores LF, regardless of the
+# platform a contributor or reviewer clones on. Without this, Windows checkouts
+# produce whole-file diffs when the repo is opened on macOS or Linux.
+* text=auto eol=lf
+
+# Binary assets: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

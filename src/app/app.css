@@ -10,7 +10,8 @@
 
 .app-tagline {
   margin: 0.25rem 0 0;
-  color: var(--p-text-muted-color);
+  /* Fallbacks: the app must not depend on a PrimeNG token name resolving. */
+  color: var(--p-text-muted-color, #64748b);
   font-size: 0.9rem;
 }
 
