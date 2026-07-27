@@ -23,9 +23,13 @@ import { join } from 'node:path';
 
 import { runDiff } from '../src/app/core/diff/diff-engine';
 import { DEFAULT_SETTINGS } from '../src/app/core/diff/sensitivity';
+import type { Box } from '../src/app/core/diff/diff-types';
 
 const WIDTH = 1280;
 const HEIGHT = 840;
+
+/** One recolour, one deletion, one character edit, one 3px dot. See README.md. */
+const EXPECTED_DIFFERENCES = 4;
 
 type Rgb = [number, number, number];
 
@@ -173,9 +177,10 @@ function text(
 // --- The scene --------------------------------------------------------------------
 
 const NAV = ['OVERVIEW', 'REPORTS', 'USERS', 'BILLING', 'SETTINGS'];
-const CARDS = [
+/** The middle card carries no value here: it is supplied per image, and differs. */
+const CARDS: { label: string; value?: string }[] = [
   { label: 'REVENUE', value: '48210' },
-  { label: 'SESSIONS', value: '1284' },
+  { label: 'SESSIONS' },
   { label: 'ERRORS', value: '7' },
 ];
 
@@ -232,8 +237,7 @@ function draw(differences: Differences): Canvas {
     panel(image, x, 104, 300, 168);
     text(image, card.label, x + 24, 128, 2, MUTED);
 
-    const value = index === 1 ? differences.sessions : card.value;
-    text(image, value, x + 24, 168, 5, INK);
+    text(image, card.value ?? differences.sessions, x + 24, 168, 5, INK);
     fillRect(image, x + 24, 240, 120, 6, BAR);
   });
 
@@ -345,3 +349,55 @@ for (const box of result.boxes) {
   );
 }
 console.log(`warnings: ${result.warnings.length ? result.warnings.join(' | ') : 'none'}`);
+
+/*
+ * The claims in README.md, checked rather than asserted.
+ *
+ * The table beside these images is written by hand, so nothing stops it drifting from
+ * them — except this. Editing the scene until the pair no longer demonstrates what it is
+ * supposed to demonstrate now fails the command that produces it, loudly, instead of
+ * quietly leaving a document that describes images that no longer exist.
+ */
+const failures: string[] = [];
+
+if (result.boxes.length !== EXPECTED_DIFFERENCES) {
+  failures.push(`expected ${EXPECTED_DIFFERENCES} differences, found ${result.boxes.length}`);
+}
+
+if (result.warnings.length > 0) {
+  failures.push(`expected no warnings, got: ${result.warnings.join(' | ')}`);
+}
+
+if (!result.boxes.some((box) => box.width < 10 && box.height < 10)) {
+  failures.push('expected at least one difference under 10px — the hardest case to detect');
+}
+
+for (const [a, b] of pairs(result.boxes)) {
+  if (overlaps(a, b)) {
+    failures.push(`boxes overlap: ${describe(a)} and ${describe(b)}`);
+  }
+}
+
+if (failures.length > 0) {
+  console.error(`\nThe sample pair no longer matches samples/README.md:`);
+  for (const failure of failures) {
+    console.error(`  - ${failure}`);
+  }
+  process.exitCode = 1;
+} else {
+  console.log('\nAll of samples/README.md still holds.');
+}
+
+function pairs<T>(items: T[]): [T, T][] {
+  return items.flatMap((item, index) => items.slice(index + 1).map((other): [T, T] => [item, other]));
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return (
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+  );
+}
+
+function describe(box: Box): string {
+  return `${box.width}x${box.height} at (${box.x},${box.y})`;
+}

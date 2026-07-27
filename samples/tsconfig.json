@@ -1,0 +1,16 @@
+/* The generator is Node, not browser, so it needs its own project: `node:zlib`, `Buffer`
+   and `process` are not in the app's or the worker's lib. Without this the file would be
+   the only TypeScript in the repository that nothing type-checks — esbuild strips types
+   without verifying them.
+
+   Check it with:  npx tsc -p samples --noEmit                                          */
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}

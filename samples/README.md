@@ -45,5 +45,11 @@ external assets, and nothing copied from a copyrighted source.
 npm run samples
 ```
 
-Rewrites both PNGs, then runs the pair through the real diff engine and prints what it
-found. The table above is that output, so it cannot drift from the images.
+Rewrites both PNGs, runs the pair through the real diff engine, prints what it found, and
+then **checks the claims on this page**: four differences, none of them overlapping, at
+least one under ten pixels, and no warnings. If an edit to the scene breaks any of those,
+the command fails and says which one — so this page cannot quietly come to describe images
+that no longer exist.
+
+The numbers in the table are transcribed from that output by hand. The checks are what
+keep them honest.
