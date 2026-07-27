@@ -56,6 +56,30 @@ function changedColumns(mask: ChangeMask): Set<number> {
   return columns;
 }
 
+/**
+ * Paint rows `fromY`..`toY` with a column pattern, optionally shifted right by `offset`.
+ *
+ * Every column is a distinct grey, so neighbouring columns differ far more than the
+ * detection threshold. Shifting the pattern by one pixel therefore makes *every* pixel a
+ * candidate — which is what stops the suppression and density specs from passing
+ * vacuously. Columns with no source (shifted in from beyond the left edge) are filled
+ * white, standing in for genuinely new content.
+ */
+function paintColumns(
+  image: ImageDataLike,
+  fromY: number,
+  toY: number,
+  offset: number = 0,
+): void {
+  for (let y = fromY; y <= toY; y++) {
+    for (let x = 0; x < image.width; x++) {
+      const source = x - offset;
+      const grey = source < 0 ? 255 : ((source + 1) * 37) % 256;
+      setPixel(image, x, y, [grey, grey, grey]);
+    }
+  }
+}
+
 /** Index of the cell containing pixel (x, y). */
 function cellIndex(x: number, y: number, cellsX: number): number {
   return Math.floor(y / CELL) * cellsX + Math.floor(x / CELL);
@@ -262,21 +286,6 @@ describe('buildChangeMask', () => {
 
   describe('anti-aliasing and sub-pixel suppression', () => {
     /**
-     * A pattern whose every column is a distinct grey, so that neighbouring columns
-     * differ far more than the detection threshold. Shifting it by one pixel therefore
-     * makes every single pixel a candidate — which is what stops the suppression specs
-     * below from passing vacuously.
-     */
-    function paintColumnPattern(image: ImageDataLike): void {
-      for (let y = 0; y < image.height; y++) {
-        for (let x = 0; x < image.width; x++) {
-          const grey = ((x + 1) * 37) % 256;
-          setPixel(image, x, y, [grey, grey, grey]);
-        }
-      }
-    }
-
-    /**
      * A vertical edge with one column of intermediate coverage — what anti-aliasing
      * actually looks like: solid on the left, a partial pixel, solid on the right.
      */
@@ -360,17 +369,10 @@ describe('buildChangeMask', () => {
       // source pixel to match against, and the right column loses its match to the
       // neighbourhood clamp. Both legitimately survive; the interior must not.
       const before = solidImage(40, 40);
-      paintColumnPattern(before);
+      paintColumns(before, 0, 39);
 
       const after = solidImage(40, 40);
-      paintColumnPattern(after);
-      for (let y = 0; y < 40; y++) {
-        for (let x = 39; x >= 1; x--) {
-          const source = ((x - 1 + 1) * 37) % 256;
-          setPixel(after, x, y, [source, source, source]);
-        }
-        setPixel(after, 0, y, [255, 255, 255]); // new content in the vacated column
-      }
+      paintColumns(after, 0, 39, 1);
 
       const mask = maskFor(before, after);
 
@@ -382,17 +384,10 @@ describe('buildChangeMask', () => {
       // Proves the previous spec is not passing because nothing was a candidate: with the
       // toggle off, all 1600 pixels are reported.
       const before = solidImage(40, 40);
-      paintColumnPattern(before);
+      paintColumns(before, 0, 39);
 
       const after = solidImage(40, 40);
-      paintColumnPattern(after);
-      for (let y = 0; y < 40; y++) {
-        for (let x = 39; x >= 1; x--) {
-          const source = ((x - 1 + 1) * 37) % 256;
-          setPixel(after, x, y, [source, source, source]);
-        }
-        setPixel(after, 0, y, [255, 255, 255]);
-      }
+      paintColumns(after, 0, 39, 1);
 
       const strict = maskFor(before, after, withSettings({ suppressAntiAliasing: false }));
 
@@ -426,17 +421,6 @@ describe('buildChangeMask', () => {
   });
 
   describe('the change-density guard', () => {
-    /** Every column a distinct grey, so a one-pixel shift makes every pixel a candidate. */
-    function paintColumns(image: ImageDataLike, fromY: number, toY: number, offset: number): void {
-      for (let y = fromY; y <= toY; y++) {
-        for (let x = 0; x < image.width; x++) {
-          const source = x - offset;
-          const grey = source < 0 ? 255 : ((source + 1) * 37) % 256;
-          setPixel(image, x, y, [grey, grey, grey]);
-        }
-      }
-    }
-
     it('trips on a uniform brightness shift and reports the whole image', () => {
       // The engine's worst input: every pixel is a candidate, every pixel exceeds the
       // threshold, and because the neighbourhood shifted too, nothing matches — so
