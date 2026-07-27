@@ -31,7 +31,14 @@
 
   <properties>
     <java.version>21</java.version>
-    <!-- Where `npm run build` leaves the application. -->
+    <!--
+      Where `npm run build` leaves the application.
+
+      The `fvd` segment is the Angular project name from frontend/angular.json. Renaming
+      the project there changes this path, and nothing links the two files but this
+      comment — which is why the enforcer check below exists: the mismatch would otherwise
+      surface as a jar that builds cleanly and serves nothing.
+    -->
     <frontend.dist>${project.basedir}/frontend/dist/fvd/browser</frontend.dist>
   </properties>
 
@@ -44,6 +51,44 @@
 
   <build>
     <plugins>
+      <!--
+        Refuse to build if the frontend has not been built.
+
+        Without this the copy below simply logs "skip non existing resourceDirectory" at
+        INFO level, the build reports SUCCESS, and the result is a jar containing no
+        application at all: the server starts, and every request returns Spring Boot's
+        error page. A green build producing a broken artefact is worse than a red one.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>require-built-frontend</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireFilesExist>
+                  <files>
+                    <file>${frontend.dist}/index.html</file>
+                  </files>
+                  <message>
+The Angular application has not been built, so there would be nothing to serve.
+
+    cd frontend &amp;&amp; npm install &amp;&amp; npm run build
+
+This Maven module only packages an already-built app; it does not invoke npm.
+                  </message>
+                </requireFilesExist>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
       <!--
         Copy the built Angular app onto the classpath under `static/`, which Spring Boot
         serves automatically. No `WebConfig` and no resource handler: the app is scaffolded
