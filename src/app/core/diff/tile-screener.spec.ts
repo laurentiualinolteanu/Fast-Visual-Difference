@@ -1,4 +1,4 @@
-import { ImageDataLike } from './diff-types';
+﻿import { ImageDataLike } from './diff-types';
 import { TILE } from './sensitivity';
 import { BLACK, WHITE, cloneImage, setPixel, solidImage } from './test-support';
 import { screenTiles } from './tile-screener';
@@ -9,17 +9,17 @@ function tileIndex(x: number, y: number, tilesX: number): number {
 }
 
 /**
- * Paint every row a distinct grey, across the given width.
+ * Paint every row of an image a distinct grey.
  *
  * Row-dependent content is what makes the differing-widths specs meaningful: if the
  * screener used one shared row stride instead of each image's own, it would compare
  * row N of one image against part of row N+1 of the other, and a uniform image would
  * hide the mistake completely.
  */
-function paintRowGradient(image: ImageDataLike, width: number): void {
+function paintRowGradient(image: ImageDataLike): void {
   for (let y = 0; y < image.height; y++) {
     const grey = (y * 7) % 256;
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < image.width; x++) {
       setPixel(image, x, y, [grey, grey, grey]);
     }
   }
@@ -95,8 +95,8 @@ describe('screenTiles', () => {
       // with its own. Sharing one stride would misalign every row after the first.
       const wide = solidImage(200, 100);
       const narrow = solidImage(160, 100);
-      paintRowGradient(wide, 200);
-      paintRowGradient(narrow, 160);
+      paintRowGradient(wide);
+      paintRowGradient(narrow);
 
       const result = screenTiles(wide, narrow, 160, 100);
 
@@ -106,8 +106,8 @@ describe('screenTiles', () => {
     it('still finds a real difference inside the overlap', () => {
       const wide = solidImage(200, 100);
       const narrow = solidImage(160, 100);
-      paintRowGradient(wide, 200);
-      paintRowGradient(narrow, 160);
+      paintRowGradient(wide);
+      paintRowGradient(narrow);
       setPixel(narrow, 100, 50, BLACK);
 
       const result = screenTiles(wide, narrow, 160, 100);

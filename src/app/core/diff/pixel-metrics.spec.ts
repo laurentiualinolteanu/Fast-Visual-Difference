@@ -29,10 +29,15 @@ describe('deltaAt', () => {
       expect(delta(pixel(0, 0, 0), pixel(255, 255, 255))).toBeCloseTo(32857, 0);
     });
 
-    it('never exceeds MAX_YIQ_DELTA', () => {
-      // MAX_YIQ_DELTA is the ceiling the sensitivity curve is expressed as a fraction of;
-      // the most extreme pair must actually sit under it.
-      expect(delta(pixel(255, 0, 255), pixel(0, 255, 0))).toBeLessThanOrEqual(MAX_YIQ_DELTA);
+    it('peaks at MAX_YIQ_DELTA, which is therefore a tight ceiling', () => {
+      // The whole sensitivity curve is expressed as a fraction of MAX_YIQ_DELTA, so it
+      // has to be the *actual* maximum rather than merely an upper bound. Cyan against
+      // red maximises the quadratic form over the RGB cube; asserting only "<= ceiling"
+      // with some arbitrary pair would pass even if the constant were badly wrong.
+      const peak = delta(pixel(0, 255, 255), pixel(255, 0, 0));
+
+      expect(peak).toBeLessThanOrEqual(MAX_YIQ_DELTA);
+      expect(peak).toBeGreaterThan(MAX_YIQ_DELTA * 0.999);
     });
 
     it('is symmetric', () => {
@@ -47,18 +52,20 @@ describe('deltaAt', () => {
       expect(delta(pixel(128, 128, 0), pixel(0, 128, 128))).toBeGreaterThan(THRESHOLD);
     });
 
-    it('detects a hue change at *identical* luminance, which a luma-only metric cannot', () => {
-      // Pure red and the grey of the same luminance: dY is 0.2 out of 255, so the luma
-      // term contributes 0.024 - far below the threshold of ~163. Only the chroma terms
-      // make this visible, which is the whole reason they are computed.
-      const red = pixel(255, 0, 0);
-      const equalLumaGrey = pixel(76, 76, 76);
+    it('detects a hue change at *identical* luminance, which a luma-only metric could not', () => {
+      // The argument, made entirely through the public API so that retuning the YIQ
+      // coefficients cannot leave a stale hand-computed number asserting nothing:
+      //
+      //   1. a full one-step greyscale difference scores far below the threshold, so
+      //      luma alone needs a much larger gap than that to trip it;
+      expect(delta(pixel(76, 76, 76), pixel(77, 77, 77))).toBeLessThan(THRESHOLD);
 
-      const full = delta(red, equalLumaGrey);
-      const lumaOnlyContribution = 0.5053 * Math.pow(0.29889531 * 179 - 0.58662247 * 76 - 0.11448223 * 76, 2);
-
-      expect(lumaOnlyContribution).toBeLessThan(THRESHOLD);
-      expect(full).toBeGreaterThan(THRESHOLD);
+      //   2. pure red and this grey differ in luminance by *less* than that single step
+      //      (dY = 0.22 of 255), yet are reported as clearly different.
+      //
+      // So what makes them different cannot be the luma term. Only the chroma terms are
+      // left, which is the entire reason they are computed.
+      expect(delta(pixel(255, 0, 0), pixel(76, 76, 76))).toBeGreaterThan(THRESHOLD);
     });
   });
 

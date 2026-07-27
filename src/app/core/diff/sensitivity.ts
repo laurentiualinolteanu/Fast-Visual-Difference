@@ -6,6 +6,8 @@
  * comment — these are the numbers a reviewer will ask about.
  */
 
+import { DiffSettings } from './diff-types';
+
 // ---------------------------------------------------------------------------------
 // Perceptual metric constants (shared with pixel-metrics.ts)
 // ---------------------------------------------------------------------------------
@@ -76,6 +78,18 @@ export const MAX_SENSITIVITY = 10;
 export const DEFAULT_SENSITIVITY = 6;
 
 /**
+ * The settings the app starts with, and the settings the specs assert against.
+ *
+ * Declared here rather than in the component so there is exactly one answer to "what
+ * are the defaults": if the app and the specs each kept their own literal, changing the
+ * app default would leave every spec quietly testing the old behaviour.
+ */
+export const DEFAULT_SETTINGS: DiffSettings = {
+  sensitivity: DEFAULT_SENSITIVITY,
+  suppressAntiAliasing: true,
+};
+
+/**
  * Threshold curve: `fraction = THRESHOLD_AT_MIN * THRESHOLD_DECAY^(S-1)`, as a fraction
  * of MAX_YIQ_DELTA. Calibrated so the default (S=6) fires on a luminance step of about
  * 18/255 — sensitive enough for low-contrast text edits, tolerant enough that noise
@@ -127,7 +141,11 @@ export function deriveParams(sensitivity: number): DerivedParams {
   };
 }
 
-/** Round to a whole slider position and clamp into range. */
-export function clampSensitivity(sensitivity: number): number {
+/**
+ * Round to a whole slider position and clamp into range.
+ * Module-private: the slider already emits integers in range, so nothing outside this
+ * file has a reason to clamp — exporting it would be surface without a caller.
+ */
+function clampSensitivity(sensitivity: number): number {
   return Math.min(MAX_SENSITIVITY, Math.max(MIN_SENSITIVITY, Math.round(sensitivity)));
 }

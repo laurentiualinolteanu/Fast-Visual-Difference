@@ -1,10 +1,4 @@
-import {
-  DEFAULT_SENSITIVITY,
-  MAX_SENSITIVITY,
-  MIN_SENSITIVITY,
-  clampSensitivity,
-  deriveParams,
-} from './sensitivity';
+import { DEFAULT_SENSITIVITY, MAX_SENSITIVITY, MIN_SENSITIVITY, deriveParams } from './sensitivity';
 
 /** Every slider position, for the monotonicity checks. */
 const ALL_POSITIONS = Array.from(
@@ -24,7 +18,12 @@ describe('deriveParams', () => {
     it('fires on a luminance step of about 18/255', () => {
       // This is the number the UI shows the user, so it has to be meaningful:
       // low enough to catch a #333 -> #555 text edit, high enough to ignore shimmer.
-      expect(deriveParams(DEFAULT_SENSITIVITY).equivalentLumaStep).toBeCloseTo(18, 0);
+      // Asserted as the band the backlog allows rather than the exact current value,
+      // so T20 can retune the curve within spec without breaking the build.
+      const step = deriveParams(DEFAULT_SENSITIVITY).equivalentLumaStep;
+
+      expect(step).toBeGreaterThanOrEqual(17);
+      expect(step).toBeLessThanOrEqual(19);
     });
   });
 
@@ -76,15 +75,5 @@ describe('deriveParams', () => {
       expect(deriveParams(5.4)).toEqual(deriveParams(5));
       expect(deriveParams(5.6)).toEqual(deriveParams(6));
     });
-  });
-});
-
-describe('clampSensitivity', () => {
-  it('rounds and clamps into range', () => {
-    expect(clampSensitivity(-1)).toBe(MIN_SENSITIVITY);
-    expect(clampSensitivity(1)).toBe(MIN_SENSITIVITY);
-    expect(clampSensitivity(6.5)).toBe(7);
-    expect(clampSensitivity(10)).toBe(MAX_SENSITIVITY);
-    expect(clampSensitivity(1000)).toBe(MAX_SENSITIVITY);
   });
 });

@@ -9,8 +9,7 @@
  * pixel at (50,60)" is its own documentation, and there is no binary to keep in sync.
  */
 
-import { DiffSettings, ImageDataLike } from './diff-types';
-import { DEFAULT_SENSITIVITY } from './sensitivity';
+import { ImageDataLike } from './diff-types';
 
 /** Opaque colour as [r, g, b], each 0..255. */
 export type Rgb = readonly [number, number, number];
@@ -18,11 +17,11 @@ export type Rgb = readonly [number, number, number];
 export const WHITE: Rgb = [255, 255, 255];
 export const BLACK: Rgb = [0, 0, 0];
 
-/** The settings the app starts with — what most specs should assert against. */
-export const DEFAULT_SETTINGS: DiffSettings = {
-  sensitivity: DEFAULT_SENSITIVITY,
-  suppressAntiAliasing: true,
-};
+/**
+ * Re-exported so specs have a single import for their fixtures. The value itself lives
+ * in `sensitivity.ts`, beside the app default it must never drift from.
+ */
+export { DEFAULT_SETTINGS } from './sensitivity';
 
 /** A uniformly filled, fully opaque image. */
 export function solidImage(width: number, height: number, fill: Rgb = WHITE): ImageDataLike {
