@@ -17,6 +17,7 @@
 import { cpus, totalmem } from 'node:os';
 
 import { runDiff } from '../src/app/core/diff/diff-engine';
+import { screenedInPercent } from '../src/app/core/log-diff-run';
 import {
   BRIDGE_CELLS,
   CELL,
@@ -177,15 +178,31 @@ const asCsv = process.argv.includes('--csv');
 const header = ['case', 'megapixels', 'tiles in', 'changed px', 'regions', 'boxes', 'engine ms'];
 const rows: string[][] = [];
 
+/**
+ * Measured once, then both printed and checked.
+ *
+ * Re-running a case to verify what was already reported means the verdict is computed
+ * from different numbers than the table shows. They agree while the engine is
+ * deterministic, which is exactly how long such a thing stays invisible.
+ */
+const measured = new Map(cases.map((testCase) => [testCase.name, measure(testCase)]));
+
+function resultFor(name: string) {
+  const found = measured.get(name);
+  if (!found) {
+    throw new Error(`No case named "${name}" — the checks below name their cases.`);
+  }
+  return found;
+}
+
 for (const testCase of cases) {
-  const { result, totalMs } = measure(testCase);
+  const { result, totalMs } = resultFor(testCase.name);
   const { stats } = result;
-  const screenedIn = (stats.candidateTiles / stats.totalTiles) * 100;
 
   rows.push([
     `${testCase.name}`,
-    (((stats.width * stats.height) / 1_000_000)).toFixed(2),
-    `${screenedIn.toFixed(1)}%`,
+    ((stats.width * stats.height) / 1_000_000).toFixed(2),
+    `${screenedInPercent(stats)}%`,
     `${stats.changedPixels}`,
     `${stats.rawRegions}`,
     `${result.boxes.length}`,
@@ -211,16 +228,15 @@ if (asCsv) {
 
 // --- The two claims this pass exists to check -------------------------------------
 
-const localised = measure(cases[1]);
-const word = measure(cases[2]);
-const localisedScreenedIn =
-  (localised.result.stats.candidateTiles / localised.result.stats.totalTiles) * 100;
+const localised = resultFor('one digit');
+const word = resultFor('one word');
+const localisedScreenedIn = Number(screenedInPercent(localised.result.stats));
 
 const problems: string[] = [];
 
 if (localisedScreenedIn >= 10) {
   problems.push(
-    `tile screen let ${localisedScreenedIn.toFixed(1)}% through for a single-digit change; ` +
+    `tile screen let ${localisedScreenedIn}% through for a single-digit change; ` +
       'single digits expected, so something upstream is wrong',
   );
 }
@@ -232,7 +248,7 @@ if (word.result.boxes.length !== 1) {
   );
 }
 
-if (cases[0] && measure(cases[0]).result.boxes.length !== 0) {
+if (resultFor('identical').result.boxes.length !== 0) {
   problems.push('identical images produced a box');
 }
 
@@ -247,7 +263,7 @@ if (cases[0] && measure(cases[0]).result.boxes.length !== 0) {
  */
 if (process.argv.includes('--boxes')) {
   console.log('\nboxes, large pair:');
-  for (const box of measure(cases[cases.length - 2]).result.boxes) {
+  for (const box of resultFor('large 3840x2520').result.boxes) {
     console.log(`  ${box.width}x${box.height} at (${box.x},${box.y}) — ${box.changedPixels} px`);
   }
 }

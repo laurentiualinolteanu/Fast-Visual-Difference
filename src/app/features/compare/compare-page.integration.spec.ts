@@ -232,4 +232,72 @@ describe('compare page against a real worker', () => {
         `${result.boxes.length} boxes`,
     );
   });
+
+  /**
+   * Anti-aliased text, re-rendered at a subpixel offset.
+   *
+   * Every other pair this project measures is drawn from `fillRect` — hard edges, no
+   * anti-aliasing, no font rasterisation. That makes the tile screen look better than it
+   * is and leaves the suppression path in §1.2 — the design's central claim — exercised
+   * only by synthetic 1px shifts of solid shapes.
+   *
+   * This is the real case. The same words are drawn twice at x and x+0.3, which is what
+   * happens when a page reflows by a fraction of a pixel or is captured on a machine that
+   * rounds layout differently: identical content, genuinely different pixels, thousands
+   * of them. A comparison without suppression reports that as change everywhere. The
+   * whole point of the feature is that this produces nothing.
+   */
+  it('does not report anti-aliased text re-rendered a third of a pixel across', async () => {
+    const messages = new MessageService();
+    TestBed.configureTestingModule({
+      imports: [ComparePageComponent],
+      providers: [provideNoopAnimations(), { provide: MessageService, useValue: messages }],
+    });
+
+    const fixture = TestBed.createComponent(ComparePageComponent);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const prose = (offset: number) =>
+      pngFile(`text-${offset}.png`, 900, 600, (context) => {
+        context.fillStyle = '#1f2937';
+        context.font = '15px system-ui, -apple-system, Segoe UI, sans-serif';
+        for (let row = 0; row < 26; row++) {
+          context.fillText(
+            'The quick brown fox jumps over the lazy dog — 0123456789 // renders anti-aliased.',
+            24 + offset,
+            40 + row * 21,
+          );
+        }
+      });
+
+    await page.onFile('before', await prose(0));
+
+    for (const offset of [0, 0.3, 1]) {
+      await page.onFile('after', await prose(offset));
+
+      page.onSettingsChange({ sensitivity: 6, suppressAntiAliasing: true });
+      await page.onCompare();
+      const on = page.result()!;
+
+      page.onSettingsChange({ sensitivity: 6, suppressAntiAliasing: false });
+      await page.onCompare();
+      const off = page.result()!;
+
+      console.warn(
+        `MEASURED anti-aliased text re-rendered ${offset}px across, 900x600: ` +
+          `suppression OFF -> ${off.stats.changedPixels} changed px, ${off.boxes.length} boxes · ` +
+          `ON -> ${on.stats.changedPixels} changed px, ${on.boxes.length} boxes`,
+      );
+
+      if (offset === 0) {
+        // Identical rendering: the floor. Anything here is a false positive outright.
+        expect(off.stats.changedPixels).toBe(0);
+        expect(on.boxes.length).toBe(0);
+      } else {
+        // Suppression must at least reduce it; how far is the measurement, not the claim.
+        expect(on.stats.changedPixels).toBeLessThan(off.stats.changedPixels);
+      }
+    }
+  });
 });
