@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 
-import { BoxOverlayComponent } from './box-overlay.component';
+import { ImagePanelComponent } from './image-panel.component';
 import { DiffService, ImageSlot, LoadedImage } from '../../core/diff.service';
 import { DiffResult, DiffSettings } from '../../core/diff/diff-types';
 import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
@@ -17,7 +17,7 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
  */
 @Component({
   selector: 'app-compare-page',
-  imports: [BoxOverlayComponent, ButtonModule],
+  imports: [ImagePanelComponent, ButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="controls">
@@ -74,36 +74,23 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       <p class="error" role="alert">{{ message }}</p>
     }
 
+    <!--
+      Written out twice rather than looped. The labels are the point: they must be fixed
+      text attached to a slot, never something the panel could infer from where it landed.
+    -->
     <div class="panels">
-      @for (panel of panels(); track panel.label) {
-        <figure class="panel">
-          <figcaption>
-            <strong>{{ panel.label }}</strong>
-            @if (panel.image; as image) {
-              <span>{{ image.width }}&times;{{ image.height }} &middot; {{ image.name }}</span>
-            }
-          </figcaption>
-
-          @if (panel.image; as image) {
-            <!--
-              The frame hugs the image exactly so the overlay, which is inset to all four
-              of its edges, lines up with it. A plain block wrapper would be the full
-              width of the panel while an image narrower than the panel would not, and
-              every box would sit that difference to the left of where it belongs.
-            -->
-            <div class="frame">
-              <img [src]="image.objectUrl" [alt]="panel.label" />
-              <app-box-overlay
-                [boxes]="boxes()"
-                [width]="image.width"
-                [height]="image.height"
-              />
-            </div>
-          } @else {
-            <p class="empty">Choose an image above.</p>
-          }
-        </figure>
-      }
+      <app-image-panel
+        label="BEFORE"
+        [image]="before()"
+        [boxes]="boxes()"
+        [stale]="stale()"
+      />
+      <app-image-panel
+        label="AFTER"
+        [image]="after()"
+        [boxes]="boxes()"
+        [stale]="stale()"
+      />
     </div>
 
     @if (result(); as diff) {
@@ -154,46 +141,10 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       gap: 1rem;
     }
 
-    .panel {
+    /* The page places its children; each panel styles its own inside. */
+    app-image-panel {
       flex: 1 1 20rem;
       min-width: 0;
-      margin: 0;
-    }
-
-    .panel figcaption {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.5rem;
-      font-size: 0.8rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .frame {
-      position: relative;
-      display: block;
-      /* Shrink to the image's used width, whether that is its natural size or the
-         panel width — the overlay is inset to this element's edges. */
-      width: fit-content;
-      max-width: 100%;
-      /* The border belongs here, not on the image: an absolutely positioned overlay
-         inset to zero resolves against this element's padding box, so a border on the
-         image itself would leave the overlay 2px wider than the pixels it describes.
-         Fallback colour — the app must not depend on a PrimeNG token name resolving. */
-      border: 1px solid var(--p-content-border-color, #e2e8f0);
-    }
-
-    .panel img {
-      display: block;
-      max-width: 100%;
-      height: auto;
-    }
-
-    .empty {
-      margin: 0;
-      padding: 2rem 1rem;
-      text-align: center;
-      color: var(--p-text-muted-color, #64748b);
-      border: 1px dashed var(--p-content-border-color, #e2e8f0);
     }
 
     .results {
@@ -256,11 +207,6 @@ export class ComparePageComponent {
   readonly canCompare = computed(
     () => !!this.before() && !!this.after() && !this.busy() && !this.loading(),
   );
-
-  readonly panels = computed(() => [
-    { label: 'BEFORE', image: this.before() },
-    { label: 'AFTER', image: this.after() },
-  ]);
 
   /**
    * Run a comparison and stop the clock once the boxes are actually on screen.
