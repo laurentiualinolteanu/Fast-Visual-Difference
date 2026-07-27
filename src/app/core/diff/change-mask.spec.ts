@@ -1,6 +1,6 @@
-import { ChangeMask, buildChangeMask } from './change-mask';
-import { ImageDataLike } from './diff-types';
-import { CELL, DEFAULT_SENSITIVITY, deriveParams } from './sensitivity';
+﻿import { ChangeMask, buildChangeMask } from './change-mask';
+import { DiffSettings, ImageDataLike } from './diff-types';
+import { CELL, DEFAULT_SENSITIVITY, DEFAULT_SETTINGS, deriveParams } from './sensitivity';
 import {
   BLACK,
   cloneImage,
@@ -15,13 +15,39 @@ import { ScreenResult, screenTiles } from './tile-screener';
 function maskFor(
   before: ImageDataLike,
   after: ImageDataLike,
-  sensitivity = DEFAULT_SENSITIVITY,
+  settings: DiffSettings = DEFAULT_SETTINGS,
 ): ChangeMask {
   const width = Math.min(before.width, after.width);
   const height = Math.min(before.height, after.height);
   const screen = screenTiles(before, after, width, height);
 
-  return buildChangeMask(before, after, width, height, screen, deriveParams(sensitivity));
+  return buildChangeMask(
+    before,
+    after,
+    width,
+    height,
+    screen,
+    deriveParams(settings.sensitivity),
+    settings.suppressAntiAliasing,
+  );
+}
+
+/** The default settings with one field overridden. */
+function withSettings(overrides: Partial<DiffSettings>): DiffSettings {
+  return { ...DEFAULT_SETTINGS, ...overrides };
+}
+
+/** Every changed pixel's x coordinate, read back from the per-cell extents. */
+function changedColumns(mask: ChangeMask): Set<number> {
+  const columns = new Set<number>();
+  for (let i = 0; i < mask.changed.length; i++) {
+    if (mask.changed[i] === 1) {
+      for (let x = mask.minX[i]; x <= mask.maxX[i]; x++) {
+        columns.add(x);
+      }
+    }
+  }
+  return columns;
 }
 
 /** Index of the cell containing pixel (x, y). */
@@ -174,6 +200,7 @@ describe('buildChangeMask', () => {
         32,
         blindScreen,
         deriveParams(DEFAULT_SENSITIVITY),
+        true,
       );
 
       expect(mask.totalChanged).toBe(0);
@@ -206,8 +233,8 @@ describe('buildChangeMask', () => {
       const after = cloneImage(before);
       fillRect(after, 8, 8, 4, 4, [112, 112, 112]); // a faint change
 
-      expect(maskFor(before, after, 1).totalChanged).toBe(0);
-      expect(maskFor(before, after, 10).totalChanged).toBe(16);
+      expect(maskFor(before, after, withSettings({ sensitivity: 1 })).totalChanged).toBe(0);
+      expect(maskFor(before, after, withSettings({ sensitivity: 10 })).totalChanged).toBe(16);
     });
   });
 
@@ -224,6 +251,128 @@ describe('buildChangeMask', () => {
       expect(mask.changed.length).toBe(mask.cellsX * mask.cellsY);
       expect(mask.changedCells).toBe(1);
       expect(mask.minX[cellIndex(9, 5, mask.cellsX)]).toBe(9);
+    });
+  });
+
+  describe('anti-aliasing and sub-pixel suppression', () => {
+    /**
+     * A pattern whose every column is a distinct grey, so that neighbouring columns
+     * differ far more than the detection threshold. Shifting it by one pixel therefore
+     * makes every single pixel a candidate — which is what stops the suppression specs
+     * below from passing vacuously.
+     */
+    function paintColumnPattern(image: ImageDataLike): void {
+      for (let y = 0; y < image.height; y++) {
+        for (let x = 0; x < image.width; x++) {
+          const grey = ((x + 1) * 37) % 256;
+          setPixel(image, x, y, [grey, grey, grey]);
+        }
+      }
+    }
+
+    it('keeps a single added pixel — the case a one-way check would lose', () => {
+      // Test 5b, and the reason the check is bidirectional. Forward finds a match: the
+      // white background around the new dot is present in both images. Only the backward
+      // direction notices that the dot's colour appears nowhere in the original.
+      const before = solidImage(40, 40);
+      const after = cloneImage(before);
+      setPixel(after, 20, 20, BLACK);
+
+      const mask = maskFor(before, after);
+
+      expect(mask.totalChanged).toBe(1);
+      expect(mask.changedCells).toBe(1);
+    });
+
+    it('keeps a single removed pixel', () => {
+      const before = solidImage(40, 40);
+      setPixel(before, 20, 20, BLACK);
+      const after = solidImage(40, 40);
+
+      const mask = maskFor(before, after);
+
+      expect(mask.totalChanged).toBe(1);
+      expect(mask.changedCells).toBe(1);
+    });
+
+    it('suppresses an element shifted one pixel inside the canvas', () => {
+      // Nothing touches the border, so every changed pixel has a match one pixel away in
+      // both directions and the shift vanishes completely.
+      const before = solidImage(40, 40);
+      fillRect(before, 10, 10, 10, 10, BLACK);
+      const after = solidImage(40, 40);
+      fillRect(after, 11, 10, 10, 10, BLACK);
+
+      expect(maskFor(before, after).totalChanged).toBe(0);
+    });
+
+    it('suppresses the interior of a whole-content shift, leaving only the edges', () => {
+      // Test 5a. Asserting zero here would be wrong: the vacated left column has no
+      // source pixel to match against, and the right column loses its match to the
+      // neighbourhood clamp. Both legitimately survive; the interior must not.
+      const before = solidImage(40, 40);
+      paintColumnPattern(before);
+
+      const after = solidImage(40, 40);
+      paintColumnPattern(after);
+      for (let y = 0; y < 40; y++) {
+        for (let x = 39; x >= 1; x--) {
+          const source = ((x - 1 + 1) * 37) % 256;
+          setPixel(after, x, y, [source, source, source]);
+        }
+        setPixel(after, 0, y, [255, 255, 255]); // new content in the vacated column
+      }
+
+      const mask = maskFor(before, after);
+
+      expect(changedColumns(mask)).toEqual(new Set([0, 39]));
+      expect(mask.totalChanged).toBe(2 * 40);
+    });
+
+    it('reports the whole shift when suppression is turned off', () => {
+      // Proves the previous spec is not passing because nothing was a candidate: with the
+      // toggle off, all 1600 pixels are reported.
+      const before = solidImage(40, 40);
+      paintColumnPattern(before);
+
+      const after = solidImage(40, 40);
+      paintColumnPattern(after);
+      for (let y = 0; y < 40; y++) {
+        for (let x = 39; x >= 1; x--) {
+          const source = ((x - 1 + 1) * 37) % 256;
+          setPixel(after, x, y, [source, source, source]);
+        }
+        setPixel(after, 0, y, [255, 255, 255]);
+      }
+
+      const strict = maskFor(before, after, withSettings({ suppressAntiAliasing: false }));
+
+      expect(strict.totalChanged).toBe(40 * 40);
+    });
+
+    it('clamps the neighbourhood to the bounds of the image being scanned', () => {
+      // The discriminating case. The compared overlap is 30 wide; the moved block ends on
+      // column 29, the last column of the narrower image. Scanning B's neighbourhood must
+      // stop at x = 29. Clamping to the wider image instead would read B[30] — which is
+      // the first pixel of the *next row*, plain white — find a false match, and wrongly
+      // suppress the whole column.
+      const wide = solidImage(40, 20);
+      fillRect(wide, 24, 5, 5, 10, BLACK); // x 24..28
+
+      const narrow = solidImage(30, 20);
+      fillRect(narrow, 25, 5, 5, 10, BLACK); // x 25..29, touching the right edge
+
+      const mask = maskFor(wide, narrow);
+
+      expect(changedColumns(mask)).toEqual(new Set([29]));
+      // Eight of the block's ten rows, not all ten: at the top and bottom rows the
+      // neighbourhood reaches into the blank row beyond the block, which matches in both
+      // directions, so those two pixels really are explained by a one-pixel diagonal
+      // shift. The eight interior rows have an all-black neighbourhood and survive.
+      //
+      // Clamping to the wider image instead would yield 0 here, not 8 — every pixel
+      // would find a false match in the next row and the column would vanish.
+      expect(mask.totalChanged).toBe(8);
     });
   });
 
@@ -279,7 +428,7 @@ describe('buildChangeMask', () => {
       const screen = screenTiles(large, large, 40, 40);
 
       expect(() =>
-        buildChangeMask(small, small, 40, 40, screen, deriveParams(DEFAULT_SENSITIVITY)),
+        buildChangeMask(small, small, 40, 40, screen, deriveParams(DEFAULT_SENSITIVITY), true),
       ).toThrowError(/does not fit inside both/);
     });
 
@@ -293,7 +442,7 @@ describe('buildChangeMask', () => {
       };
 
       expect(() =>
-        buildChangeMask(image, image, 32, 32, shortScreen, deriveParams(DEFAULT_SENSITIVITY)),
+        buildChangeMask(image, image, 32, 32, shortScreen, deriveParams(DEFAULT_SENSITIVITY), true),
       ).toThrowError(/tile flags/);
     });
 
@@ -303,8 +452,17 @@ describe('buildChangeMask', () => {
       const wrongSizedScreen = screenTiles(before, after, 16, 16);
 
       expect(() =>
-        buildChangeMask(before, after, 32, 32, wrongSizedScreen, deriveParams(DEFAULT_SENSITIVITY)),
+        buildChangeMask(
+          before,
+          after,
+          32,
+          32,
+          wrongSizedScreen,
+          deriveParams(DEFAULT_SENSITIVITY),
+          true,
+        ),
       ).toThrowError(/tile grid/);
     });
   });
 });
+

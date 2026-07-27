@@ -10,7 +10,8 @@
  * cell also remembers the exact pixel extents of what changed inside it, so boxes stay
  * pixel-tight instead of being quantised to the cell grid — cheap grouping, exact bounds.
  *
- * Anti-aliasing suppression is deliberately *not* here yet; T05 adds it.
+ * This stage also carries the sub-pixel suppression that lets the engine report a
+ * one-pixel change while ignoring anti-aliasing shimmer — see `isExplainedByShift`.
  */
 
 import { ImageDataLike } from './diff-types';
@@ -41,6 +42,8 @@ export interface ChangeMask {
  * Score the candidate tiles of the compared overlap and build the cell grid.
  *
  * @param screen result of `screenTiles` for the same region — its tile grid must match.
+ * @param suppressAntiAliasing drop pixels explained by anti-aliasing or a shift of at
+ *   most one pixel. On by default in the app; turning it off restores strict comparison.
  */
 export function buildChangeMask(
   a: ImageDataLike,
@@ -49,6 +52,7 @@ export function buildChangeMask(
   height: number,
   screen: ScreenResult,
   params: DerivedParams,
+  suppressAntiAliasing: boolean,
 ): ChangeMask {
   // Both guards matter, and they check different things: the region must fit inside the
   // two images (or we read past the buffers), and the screening result must describe
@@ -70,6 +74,13 @@ export function buildChangeMask(
 
   const { candidates, tilesX, tilesY } = screen;
   const threshold = params.colorThreshold;
+  /*
+   * A suppression match must be twice as good as the detection threshold. Deliberately
+   * conservative: we only discard a difference when the evidence that it is a shift is
+   * strong, because a wrongly suppressed pixel is an invisible false negative while a
+   * wrongly kept one is merely a box the user can see and judge.
+   */
+  const matchThreshold = threshold * 0.5;
 
   // Counters are locals rather than fields so the hot loop touches no object.
   let totalChanged = 0;
@@ -95,6 +106,9 @@ export function buildChangeMask(
 
         for (let x = left; x < right; x++) {
           if (deltaAt(a.data, (rowA + x) * 4, b.data, (rowB + x) * 4) <= threshold) {
+            continue;
+          }
+          if (suppressAntiAliasing && isExplainedByShift(a, b, x, y, matchThreshold)) {
             continue;
           }
 
@@ -144,6 +158,79 @@ export function buildChangeMask(
     totalChanged,
     changedCells,
   };
+}
+
+/**
+ * Is this difference explained by anti-aliasing, or by a shift of at most one pixel?
+ *
+ * Both directions must find a match, and that is not a symmetry nicety — a one-way
+ * check silently loses *added* elements:
+ *
+ *   - an element **removed** (A has a dark dot, B is uniform): A's dark colour appears
+ *     nowhere in B's neighbourhood, so the forward check already keeps it;
+ *   - an element **added** (A is uniform, B has a dark dot): the forward check compares
+ *     A's *background* pixel against B's neighbourhood, which still contains background
+ *     in the ring around the dot. It matches, and the new dot disappears.
+ *
+ * Requiring both directions keeps the addition: B's dark colour appears nowhere in A's
+ * neighbourhood. Genuine anti-aliasing passes both, because it only redistributes
+ * colours that exist on both sides of the edge.
+ */
+function isExplainedByShift(
+  a: ImageDataLike,
+  b: ImageDataLike,
+  x: number,
+  y: number,
+  matchThreshold: number,
+): boolean {
+  // Does A's colour exist somewhere in B's neighbourhood?
+  const forward = neighbourhoodMin(a.data, (y * a.width + x) * 4, b, x, y);
+  if (forward >= matchThreshold) {
+    return false; // No point scanning the other direction.
+  }
+
+  // ...and does B's colour exist somewhere in A's?
+  return neighbourhoodMin(b.data, (y * b.width + x) * 4, a, x, y) < matchThreshold;
+}
+
+/**
+ * Smallest distance between one pixel and any pixel in the 3x3 neighbourhood of (x, y)
+ * in `scan`. Argument order is irrelevant because `deltaAt` is symmetric, which is why
+ * this takes a pixel and an image to search rather than a direction flag.
+ */
+function neighbourhoodMin(
+  fixed: Uint8ClampedArray,
+  fixedIndex: number,
+  scan: ImageDataLike,
+  x: number,
+  y: number,
+): number {
+  // Clamped to the *scanned* image's own bounds. The two images need not be the same
+  // size, and clamping to the wrong one would read across into the next row.
+  const firstY = Math.max(0, y - 1);
+  const lastY = Math.min(scan.height - 1, y + 1);
+  const firstX = Math.max(0, x - 1);
+  const lastX = Math.min(scan.width - 1, x + 1);
+
+  let best = Infinity;
+
+  for (let ny = firstY; ny <= lastY; ny++) {
+    const row = ny * scan.width;
+
+    for (let nx = firstX; nx <= lastX; nx++) {
+      const candidate = deltaAt(fixed, fixedIndex, scan.data, (row + nx) * 4);
+
+      if (candidate < best) {
+        best = candidate;
+
+        if (best === 0) {
+          return 0; // An exact match; nothing can beat it.
+        }
+      }
+    }
+  }
+
+  return best;
 }
 
 /**
