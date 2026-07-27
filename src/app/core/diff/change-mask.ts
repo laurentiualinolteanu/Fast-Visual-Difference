@@ -16,7 +16,7 @@
 import { ImageDataLike } from './diff-types';
 import { deltaAt } from './pixel-metrics';
 import { CELL, DerivedParams, TILE } from './sensitivity';
-import { ScreenResult } from './tile-screener';
+import { ScreenResult, assertComparableRegion } from './tile-screener';
 
 export interface ChangeMask {
   readonly cellsX: number;
@@ -50,6 +50,10 @@ export function buildChangeMask(
   screen: ScreenResult,
   params: DerivedParams,
 ): ChangeMask {
+  // Both guards matter, and they check different things: the region must fit inside the
+  // two images (or we read past the buffers), and the screening result must describe
+  // that same region (or we consult the wrong candidate flags).
+  assertComparableRegion(a, b, width, height);
   assertScreenMatchesRegion(screen, width, height);
 
   const cellsX = Math.ceil(width / CELL);
@@ -155,6 +159,17 @@ function assertScreenMatchesRegion(screen: ScreenResult, width: number, height: 
     throw new Error(
       `Screening result covers a ${screen.tilesX}x${screen.tilesY} tile grid, ` +
         `but ${width}x${height} needs ${expectedTilesX}x${expectedTilesY}`,
+    );
+  }
+
+  // A short flag array would read `undefined`, and `undefined === 0` is false — so every
+  // missing tile would be treated as a candidate and scored. Checking the dimensions
+  // without checking the array implies a coverage this guard would not actually give.
+  const expectedFlags = expectedTilesX * expectedTilesY;
+  if (screen.candidates.length !== expectedFlags) {
+    throw new Error(
+      `Screening result holds ${screen.candidates.length} tile flags, but its ` +
+        `${expectedTilesX}x${expectedTilesY} grid needs ${expectedFlags}`,
     );
   }
 }

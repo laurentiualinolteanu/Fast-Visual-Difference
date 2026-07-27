@@ -73,6 +73,22 @@ export function fillRect(
   }
 }
 
+/**
+ * Paint every row of an image a distinct grey.
+ *
+ * Row-dependent content is what makes the differing-width specs meaningful. Code that
+ * used one shared row stride for both images would compare row N of one against part of
+ * row N+1 of the other — and against a uniform image that mistake finds nothing at all.
+ */
+export function paintRowGradient(image: ImageDataLike): void {
+  for (let y = 0; y < image.height; y++) {
+    const grey = (y * 7) % 256;
+    for (let x = 0; x < image.width; x++) {
+      setPixel(image, x, y, [grey, grey, grey]);
+    }
+  }
+}
+
 /** Independent copy — for building an "after" image from a "before". */
 export function cloneImage(image: ImageDataLike): ImageDataLike {
   return {

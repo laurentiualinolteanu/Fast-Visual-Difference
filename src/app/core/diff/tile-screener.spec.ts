@@ -1,28 +1,18 @@
 ﻿import { ImageDataLike } from './diff-types';
 import { TILE } from './sensitivity';
-import { BLACK, WHITE, cloneImage, setPixel, solidImage } from './test-support';
+import {
+  BLACK,
+  WHITE,
+  cloneImage,
+  paintRowGradient,
+  setPixel,
+  solidImage,
+} from './test-support';
 import { screenTiles } from './tile-screener';
 
 /** Index of the tile containing pixel (x, y). */
 function tileIndex(x: number, y: number, tilesX: number): number {
   return Math.floor(y / TILE) * tilesX + Math.floor(x / TILE);
-}
-
-/**
- * Paint every row of an image a distinct grey.
- *
- * Row-dependent content is what makes the differing-widths specs meaningful: if the
- * screener used one shared row stride instead of each image's own, it would compare
- * row N of one image against part of row N+1 of the other, and a uniform image would
- * hide the mistake completely.
- */
-function paintRowGradient(image: ImageDataLike): void {
-  for (let y = 0; y < image.height; y++) {
-    const grey = (y * 7) % 256;
-    for (let x = 0; x < image.width; x++) {
-      setPixel(image, x, y, [grey, grey, grey]);
-    }
-  }
 }
 
 describe('screenTiles', () => {

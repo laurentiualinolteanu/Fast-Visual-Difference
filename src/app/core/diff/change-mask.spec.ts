@@ -1,7 +1,14 @@
 import { ChangeMask, buildChangeMask } from './change-mask';
 import { ImageDataLike } from './diff-types';
 import { CELL, DEFAULT_SENSITIVITY, deriveParams } from './sensitivity';
-import { BLACK, cloneImage, fillRect, setPixel, solidImage } from './test-support';
+import {
+  BLACK,
+  cloneImage,
+  fillRect,
+  paintRowGradient,
+  setPixel,
+  solidImage,
+} from './test-support';
 import { ScreenResult, screenTiles } from './tile-screener';
 
 /** Build the mask the way the engine will: screen first, then score the candidates. */
@@ -220,7 +227,76 @@ describe('buildChangeMask', () => {
     });
   });
 
+  describe('images of different widths', () => {
+    // Stage 2 does its own per-image row arithmetic (`y * a.width`, `y * b.width`), so
+    // the stride hazard the screener specs guard against exists here independently.
+    // Every other spec in this file compares an image with a clone of itself, which
+    // cannot catch it.
+
+    it('finds nothing when the overlap is identical', () => {
+      const wide = solidImage(200, 100);
+      const narrow = solidImage(160, 100);
+      paintRowGradient(wide);
+      paintRowGradient(narrow);
+
+      const mask = maskFor(wide, narrow);
+
+      expect(mask.totalChanged).toBe(0);
+      expect(mask.changedCells).toBe(0);
+    });
+
+    it('records a real change inside the overlap at the right cell', () => {
+      const wide = solidImage(200, 100);
+      const narrow = solidImage(160, 100);
+      paintRowGradient(wide);
+      paintRowGradient(narrow);
+      setPixel(narrow, 100, 50, BLACK);
+
+      const mask = maskFor(wide, narrow);
+
+      // The compared region is 160x100, so cellsX = ceil(160 / 4) = 40;
+      // floor(50 / 4) * 40 + floor(100 / 4) = 12 * 40 + 25.
+      const cell = 505;
+      expect(mask.cellsX).toBe(40);
+      expect(cellIndex(100, 50, mask.cellsX)).toBe(cell);
+
+      expect(mask.totalChanged).toBe(1);
+      expect(changedCellIndices(mask)).toEqual([cell]);
+      expect(mask.minX[cell]).toBe(100);
+      expect(mask.maxX[cell]).toBe(100);
+      expect(mask.minY[cell]).toBe(50);
+      expect(mask.maxY[cell]).toBe(50);
+    });
+  });
+
   describe('validation', () => {
+    it('rejects a region that does not fit inside both images', () => {
+      // Without this guard the scoring loop reads past both buffers. Those reads yield
+      // `undefined` -> `NaN`, and `NaN <= threshold` is false, so every out-of-range
+      // pixel would be recorded as changed: a mask full of differences that do not exist.
+      const small = solidImage(10, 10);
+      const large = solidImage(40, 40);
+      const screen = screenTiles(large, large, 40, 40);
+
+      expect(() =>
+        buildChangeMask(small, small, 40, 40, screen, deriveParams(DEFAULT_SENSITIVITY)),
+      ).toThrowError(/does not fit inside both/);
+    });
+
+    it('rejects a screening result with too few tile flags', () => {
+      const image = solidImage(32, 32);
+      const shortScreen: ScreenResult = {
+        candidates: new Uint8Array(3), // grid says 4x4 = 16
+        tilesX: 4,
+        tilesY: 4,
+        candidateCount: 0,
+      };
+
+      expect(() =>
+        buildChangeMask(image, image, 32, 32, shortScreen, deriveParams(DEFAULT_SENSITIVITY)),
+      ).toThrowError(/tile flags/);
+    });
+
     it('rejects a screening result describing a different region', () => {
       const before = solidImage(32, 32);
       const after = cloneImage(before);

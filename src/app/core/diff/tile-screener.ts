@@ -94,8 +94,15 @@ function pixelWords(image: ImageDataLike, label: string): Uint32Array {
   return new Uint32Array(data.buffer, data.byteOffset, width * height);
 }
 
-/** The compared region must be a real overlap of both images. */
-function assertComparableRegion(
+/**
+ * The compared region must be a real overlap of both images.
+ *
+ * Exported because Stage 2 needs the same guarantee: it indexes both pixel buffers
+ * directly, and an out-of-range read yields `undefined`, which propagates to `NaN` —
+ * and `NaN <= threshold` is false, so the pixel is recorded as *changed*. An oversized
+ * region would therefore not crash but quietly fill the mask with phantom differences.
+ */
+export function assertComparableRegion(
   a: ImageDataLike,
   b: ImageDataLike,
   width: number,

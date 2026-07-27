@@ -1,4 +1,12 @@
-import { BLACK, WHITE, cloneImage, fillRect, setPixel, solidImage } from './test-support';
+import {
+  BLACK,
+  WHITE,
+  cloneImage,
+  fillRect,
+  paintRowGradient,
+  setPixel,
+  solidImage,
+} from './test-support';
 
 /**
  * The harness is the ruler every other spec in `core/diff` measures with. If `setPixel`
@@ -97,6 +105,27 @@ describe('test-support', () => {
     it('rejects a rectangle that runs off the edge', () => {
       const image = solidImage(4, 4);
       expect(() => fillRect(image, 2, 2, 3, 3, BLACK)).toThrowError(/outside 4x4/);
+    });
+  });
+
+  describe('paintRowGradient', () => {
+    it('makes every row a uniform grey that differs from its neighbours', () => {
+      // Both properties matter: uniform *within* a row so a spec can change one pixel
+      // and know nothing else moved, and distinct *between* rows so a shared-stride bug
+      // in the code under test cannot hide.
+      const image = solidImage(5, 4);
+      paintRowGradient(image);
+
+      const rowValue = (y: number) => image.data[y * 5 * 4];
+
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 5; x++) {
+          expect(image.data[(y * 5 + x) * 4])
+            .withContext(`pixel (${x}, ${y})`)
+            .toBe(rowValue(y));
+        }
+      }
+      expect(new Set([rowValue(0), rowValue(1), rowValue(2), rowValue(3)]).size).toBe(4);
     });
   });
 
