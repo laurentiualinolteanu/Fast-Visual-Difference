@@ -153,9 +153,8 @@ export class DiffService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.discardWorker();
     this.failAll(new Error('The comparison engine was shut down.'));
-    this.worker?.terminate();
-    this.worker = undefined;
     this.revoke('before');
     this.revoke('after');
   }
@@ -184,7 +183,7 @@ export class DiffService implements OnDestroy {
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;
 
-      const context = canvas.getContext('2d', { willReadFrequently: false });
+      const context = canvas.getContext('2d');
       if (!context) {
         throw new Error('This browser did not provide a 2D canvas context.');
       }
@@ -228,7 +227,7 @@ export class DiffService implements OnDestroy {
       worker = this.createWorker();
     } catch (cause) {
       throw new Error(
-        `The comparison engine could not be started: ${describe(cause)}. ` +
+        `The comparison engine could not be started: ${messageOf(cause)}. ` +
           'This browser may not support module workers.',
       );
     }
@@ -237,10 +236,19 @@ export class DiffService implements OnDestroy {
 
     // Fires for an uncaught error inside the worker and for a failure to load its script
     // at all. Either way every promise waiting on it is now waiting forever.
-    worker.onerror = (event) =>
+    worker.onerror = (event) => {
+      /*
+       * Discard first, then reject. A worker whose script failed to load will never
+       * answer anything, so leaving it installed means the next request queues behind a
+       * corpse and never settles — one readable error, then a spinner that turns forever.
+       * Dropping the reference makes the next request spawn a fresh worker; if the fault
+       * is permanent that one errors too, and rejects readably rather than hanging.
+       */
+      this.discardWorker();
       this.failAll(
         new Error(`The comparison engine stopped: ${event.message || 'unknown error'}.`),
       );
+    };
 
     // The reply could not be deserialised. Rare, but it consumes no queue entry, so
     // without this the request it belonged to would hang.
@@ -268,6 +276,11 @@ export class DiffService implements OnDestroy {
     }
   }
 
+  private discardWorker(): void {
+    this.worker?.terminate();
+    this.worker = undefined;
+  }
+
   private failAll(error: Error): void {
     for (const request of this.pending.splice(0)) {
       request.reject(error);
@@ -283,6 +296,6 @@ export class DiffService implements OnDestroy {
   }
 }
 
-function describe(cause: unknown): string {
+function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }

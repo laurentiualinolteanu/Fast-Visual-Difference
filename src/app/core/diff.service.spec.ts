@@ -14,6 +14,7 @@ import {
   toFailure,
 } from './diff-worker-protocol';
 import { DEFAULT_SETTINGS } from './diff/sensitivity';
+import { solidImage } from './diff/test-support';
 
 /**
  * A stand-in for the real worker that runs the real protocol.
@@ -51,14 +52,51 @@ class ProtocolWorker {
   }
 }
 
+/**
+ * Runs the protocol but holds every reply until `flush()`.
+ *
+ * Needed to get two requests genuinely in flight at once: `ProtocolWorker` answers on the
+ * next microtask, which is too soon to overlap anything.
+ */
+class DeferredWorker {
+  onmessage: ((event: MessageEvent<DiffWorkerResponse>) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  onmessageerror: ((event: MessageEvent) => void) | null = null;
+
+  readonly images: ImageStore = {};
+  private readonly replies: DiffWorkerResponse[] = [];
+
+  postMessage(request: DiffWorkerRequest): void {
+    try {
+      this.replies.push(handleRequest(request, this.images));
+    } catch (failure) {
+      this.replies.push(toFailure(request, failure));
+    }
+  }
+
+  terminate(): void {}
+
+  /** Deliver the held replies in the order the requests arrived. */
+  flush(): void {
+    for (const response of this.replies.splice(0)) {
+      this.onmessage?.({ data: response } as MessageEvent<DiffWorkerResponse>);
+    }
+  }
+}
+
 /** A worker that accepts messages and never answers — for the failure paths. */
 class SilentWorker {
   onmessage: ((event: MessageEvent<DiffWorkerResponse>) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
   onmessageerror: ((event: MessageEvent) => void) | null = null;
 
+  terminated = false;
+
   postMessage(): void {}
-  terminate(): void {}
+
+  terminate(): void {
+    this.terminated = true;
+  }
 }
 
 /** Build a real PNG so the specs go through the browser's actual decoder. */
@@ -244,6 +282,29 @@ describe('DiffService', () => {
     });
   });
 
+  describe('two requests in flight', () => {
+    it('settles each request with its own reply', async () => {
+      // The reason this service keeps a queue rather than the single `pending` field the
+      // Implementation Guide uses: `loadImage` awaits its own acknowledgement, so a load
+      // and a comparison can overlap. With one slot the second request overwrites the
+      // first's handlers — the first would hang and its failure would land on the second.
+      const worker = new DeferredWorker();
+      const service = serviceWith(worker);
+
+      const beforeImagesArrive = service.compare(DEFAULT_SETTINGS);
+
+      // Fill the worker's store between the two requests so their replies differ.
+      worker.images.before = solidImage(16, 16);
+      worker.images.after = solidImage(16, 16);
+
+      const afterImagesArrive = service.compare(DEFAULT_SETTINGS);
+      worker.flush();
+
+      await expectAsync(beforeImagesArrive).toBeRejectedWithError(/Both images must be loaded/);
+      await expectAsync(afterImagesArrive).toBeResolved();
+    });
+  });
+
   describe('worker failures', () => {
     it('rejects with a readable message when the worker cannot be constructed', async () => {
       const service = serviceWithFactory(() => {
@@ -263,6 +324,29 @@ describe('DiffService', () => {
       worker.onerror?.({ message: 'script load failed' } as ErrorEvent);
 
       await expectAsync(pending).toBeRejectedWithError(/engine stopped: script load failed/);
+    });
+
+    it('discards the dead worker so a later request settles instead of hanging', async () => {
+      // A worker whose script failed to load never answers again. Keeping it installed
+      // would give the user one readable error and then a spinner that turns forever.
+      const spawned: SilentWorker[] = [];
+      const service = serviceWithFactory(() => {
+        const worker = new SilentWorker();
+        spawned.push(worker);
+        return worker as unknown as Worker;
+      });
+
+      const first = service.compare(DEFAULT_SETTINGS);
+      spawned[0].onerror?.({ message: 'script load failed' } as ErrorEvent);
+      await expectAsync(first).toBeRejected();
+      expect(spawned[0].terminated).toBeTrue();
+
+      const second = service.compare(DEFAULT_SETTINGS);
+      expect(spawned.length).toBe(2);
+
+      // The replacement fails the same way — but it fails, which is the whole point.
+      spawned[1].onerror?.({ message: 'script load failed' } as ErrorEvent);
+      await expectAsync(second).toBeRejectedWithError(/engine stopped/);
     });
 
     it('rejects rather than hanging when a reply cannot be deserialised', async () => {
