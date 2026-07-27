@@ -397,6 +397,42 @@ describe('ComparePageComponent', () => {
       ]);
     });
 
+    it('actually renders what it dispatches', async () => {
+      /*
+       * Every other spec here intercepts `MessageService.add`, which proves the page
+       * dispatches correctly and says nothing about whether anything displays it. Remove
+       * `<p-toast />` from the template and the app fails silently: errors are raised,
+       * routed, and seen by nobody.
+       *
+       * So this one uses the real service end to end and reads the DOM.
+       */
+      TestBed.resetTestingModule();
+      const realMessages = new MessageService();
+      TestBed.configureTestingModule({
+        imports: [ComparePageComponent],
+        providers: [
+          provideNoopAnimations(),
+          { provide: DiffService, useValue: service },
+          { provide: MessageService, useValue: realMessages },
+        ],
+      });
+
+      const liveFixture = TestBed.createComponent(ComparePageComponent);
+      liveFixture.detectChanges();
+
+      const failing = liveFixture.componentInstance.onFile(
+        'before',
+        new File([], 'bad.png', { type: 'image/png' }),
+      );
+      service.rejectLoad('"bad.png" could not be decoded.');
+      await failing;
+      liveFixture.detectChanges();
+
+      const shown = (liveFixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(shown).toContain('Could not load image');
+      expect(shown).toContain('could not be decoded');
+    });
+
     it('never rejects the promise a template binding does not await', async () => {
       // `(fileSelected)="onFile(...)"` and `(compare)="onCompare()"` discard the returned
       // promise. If either could reject, the failure would appear only as an unhandled

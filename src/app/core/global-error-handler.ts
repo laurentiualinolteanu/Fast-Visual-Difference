@@ -1,6 +1,8 @@
 import { ErrorHandler, Injectable, Injector, inject } from '@angular/core';
 import { MessageService } from 'primeng/api';
 
+import { messageOf } from './error-message';
+
 /**
  * The last line of defence: anything thrown that no one caught.
  *
@@ -42,14 +44,3 @@ export class GlobalErrorHandler implements ErrorHandler {
   }
 }
 
-function messageOf(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  // Angular wraps rejections and some listener errors; unwrap one level if it helps.
-  const wrapped = (error as { rejection?: unknown })?.rejection;
-  if (wrapped instanceof Error) {
-    return wrapped.message;
-  }
-  return String(error);
-}

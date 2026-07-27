@@ -1,5 +1,7 @@
 import { Injectable, InjectionToken, OnDestroy, inject } from '@angular/core';
 
+import { messageOf } from './error-message';
+
 import type { DiffResult, DiffSettings } from './diff/diff-types';
 import type {
   DiffWorkerRequest,
@@ -329,6 +331,3 @@ export class DiffService implements OnDestroy {
   }
 }
 
-function messageOf(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
-}

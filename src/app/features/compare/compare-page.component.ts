@@ -6,6 +6,7 @@ import { ControlsBarComponent } from './controls-bar.component';
 import { ImagePanelComponent } from './image-panel.component';
 import { ResultsSummaryComponent } from './results-summary.component';
 import { DiffService, ImageSlot, LoadedImage, largeImageWarning } from '../../core/diff.service';
+import { messageOf } from '../../core/error-message';
 import { logDiffRun } from '../../core/log-diff-run';
 import { DiffResult, DiffSettings } from '../../core/diff/diff-types';
 import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
@@ -85,9 +86,6 @@ import { DEFAULT_SETTINGS } from '../../core/diff/sensitivity';
       min-width: 0;
     }
 
-    .error {
-      color: var(--p-red-600, #dc2626);
-    }
   `,
 })
 export class ComparePageComponent {
@@ -271,6 +269,3 @@ export class ComparePageComponent {
 
 }
 
-function messageOf(failure: unknown): string {
-  return failure instanceof Error ? failure.message : String(failure);
-}
