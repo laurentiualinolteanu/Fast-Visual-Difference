@@ -104,9 +104,13 @@ export const MERGE_GAP_ESCALATION = 3;
 export const MAX_MERGE_GAP_PX = 128;
 
 /**
- * Hard ceiling on returned boxes. Rendering is inside the measured window, so an
- * unbounded box count would make paint the bottleneck. Exceeding it coarsens the merge
- * and, failing that, truncates — always with a warning, never silently.
+ * Ceiling on *change* boxes. Rendering is inside the measured window, so an unbounded
+ * box count would make paint the bottleneck. Exceeding it coarsens the merge and,
+ * failing that, truncates — always with a warning, never silently.
+ *
+ * The at most two size bands for a dimension mismatch are additional, so a result can
+ * hold 202 boxes. They are a fixed, tiny cost and a different kind of statement, so
+ * spending part of the change budget on them would be the wrong trade.
  */
 export const MAX_BOXES = 200;
 

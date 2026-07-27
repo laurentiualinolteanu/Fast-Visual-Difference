@@ -98,6 +98,38 @@ describe('runDiff', () => {
     });
   });
 
+  describe('the order of the result', () => {
+    it('lists change boxes largest-first, then any size bands', () => {
+      // Size bands are appended after merging so they cannot absorb a change, which also
+      // puts them last regardless of area — here the band is the largest box of the three
+      // and still comes third. That is the contract, not an accident of statement order.
+      const before = solidImage(64, 64);
+      fillRect(before, 5, 5, 20, 20, BLACK);
+      setPixel(before, 50, 50, BLACK);
+      const after = solidImage(64, 80);
+
+      const { boxes } = diff(before, after);
+
+      expect(boxes.map((box) => box.kind)).toEqual(['change', 'change', 'size']);
+      expect(boxes[0].width * boxes[0].height).toBeGreaterThan(boxes[1].width * boxes[1].height);
+      expect(boxes[2].width * boxes[2].height).toBeGreaterThan(boxes[0].width * boxes[0].height);
+    });
+
+    it('reports warnings cause-first', () => {
+      // What happened to the comparison, then what happened to the dimensions. The UI
+      // shows these in order, so reordering the pushes would change what a user reads
+      // first with nothing to catch it.
+      const before = solidImage(64, 64, [100, 100, 100]);
+      const after = solidImage(64, 80, [130, 130, 130]);
+
+      const { warnings } = diff(before, after);
+
+      expect(warnings.length).toBe(2);
+      expect(warnings[0]).toContain('of the image differs');
+      expect(warnings[1]).toContain('differ in size');
+    });
+  });
+
   describe('the change-density warning', () => {
     it('explains itself when refinement was abandoned', () => {
       // T06 sets the flag; without this the guard is a silent speed-up and the coarse
@@ -175,8 +207,12 @@ describe('runDiff', () => {
   });
 
   describe('validation', () => {
-    it('rejects an empty before image, naming it', () => {
+    it('accepts the smallest usable image', () => {
+      // Pins the boundary: the guard rejects zero, not "too small to be interesting".
       expect(() => diff(solidImage(1, 1), solidImage(10, 10))).not.toThrow();
+    });
+
+    it('rejects an empty before image, naming it', () => {
       expect(() => runDiff({ width: 0, height: 10, data: new Uint8ClampedArray(0) }, solidImage(10, 10), DEFAULT_SETTINGS))
         .toThrowError(/before image.*0x10/);
       expect(() => runDiff({ width: 10, height: 0, data: new Uint8ClampedArray(0) }, solidImage(10, 10), DEFAULT_SETTINGS))

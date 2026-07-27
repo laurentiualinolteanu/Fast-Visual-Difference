@@ -78,6 +78,14 @@ export interface DiffStats {
 
 /** Everything one comparison produces. */
 export interface DiffResult {
+  /**
+   * Change boxes first, largest by area, then any size bands.
+   *
+   * The two kinds are deliberately not interleaved. A size band says "these images are
+   * not the same shape", which is a different statement from "this part of the picture
+   * changed" — sorting a 40px sliver of missing canvas in among the real differences
+   * would bury one in the other. The UI renders this order directly.
+   */
   boxes: Box[];
   timings: StageTimings;
   stats: DiffStats;
