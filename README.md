@@ -204,8 +204,8 @@ docker run --rm -p 8080:8080 fast-visual-difference
 
 The `Dockerfile` has three stages — Node builds the Angular app, Maven packages the jar,
 and a **JRE** image runs it. Only the jar crosses into the final image, so `node_modules`
-and the compilers stay behind: **228 MB** rather than well over a gigabyte. It runs as a
-non-root user.
+and the compilers stay behind: **228 MB**, against the **649 MB** build stage it came out of
+(`docker build --target backend` reproduces that figure). It runs as a non-root user.
 
 **`docker-compose.yml` is shorthand for one `docker run`, not orchestration.** There is one
 service because there is one process and it serves static files — no database, no queue,
